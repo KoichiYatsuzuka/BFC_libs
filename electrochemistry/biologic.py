@@ -194,6 +194,45 @@ def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
 	condition = raw_txt_lines[:num_skip_lines-1]
 	df = pd.read_csv(file_path, sep="\t", skiprows=num_skip_lines)
 
+
+	# preparing to slice CVs
+	cycle_border_list = [0]
+	for i in range(0, df["cycle number"].size-2):
+		if df["cycle number"][i] != df["cycle number"][i+1]:
+			cycle_border_list.append(i+1)
+	cycle_border_list.append(len(df["cycle number"])-1)
+
+	CycleRange = namedtuple("Cyclerange", ["begin", "end"])
+	cycle_range_list: list[CycleRange] = []
+	for i in range(len(cycle_border_list)-1):
+		cycle_range_list.append(
+			CycleRange(cycle_border_list[i], cycle_border_list[i+1]-1)
+			)
+		
+	eis_list = []
+
+	for i, cycle_range in enumerate (cycle_range_list):
+		tmp_eis = EIS(
+			_real_Z = ec.ImpedanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+			_imaginary_Z = ec.ImpedanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+			_frequency = ec.FrequencyArray(np.array(df["freq/Hz"][cycle_range.begin:cycle_range.end]), meta=file_path),
+			_data_name = "",
+			_others_data = df.drop(columns=["Re(Z)/Ohm", "-Im(Z)/Ohm", "freq/Hz"])[cycle_range.begin:cycle_range.end].reset_index(),
+			_comment = ["file: "+cmn.extract_filename(file_path)],
+			_condition = condition,
+			_original_file_path = file_path
+		)
+		eis_list.append(copy(tmp_eis))
+
+
+	return BiologicEISData(
+		_data = cmn.DataArray[EIS](eis_list),
+		_data_name = cmn.extract_filename(file_path),
+		_comment = ["file: "+cmn.extract_filename(file_path)],
+		_condition = condition,
+		_file_path = file_path
+	)
+
 	return BiologicEISData(
 		_data = [EIS(
 			_real_Z = ec.ImpedanceArray(np.array(df["Re(Z)/Ohm"]), meta=file_path),
@@ -210,8 +249,6 @@ def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
 		_condition = condition,
 		_file_path = file_path
 	)
-
-
 	pass
 
 """def load_biologic_mpt(file_path: str)->Union[Voltammogram, BiologicEIS]:
