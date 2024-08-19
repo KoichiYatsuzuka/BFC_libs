@@ -125,6 +125,62 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 	
 	pass
 
+@dataclass(frozen=True)
+class BiologicCPData(cmn.DataFile[ec.ChronoAmperogram]):
+	
+	@classmethod
+	def load_file(cls, file_path: str):
+		skipped_line_num, condition = biologic_file_info(file_path)
+		df = pd.read_csv(file_path, sep="\t", skiprows=skipped_line_num)
+
+		# preparing to slice CVs
+		#cycle_border_list = [0]
+		"""for i in range(0, df["Ns"].size-2):
+			if df["Ns"][i] != df["Ns"][i+1]:
+				cycle_border_list.append(i+1)
+		cycle_border_list.append(len(df["Ns"])-1)
+		"""
+		
+		delta_Ns = df["cycle number"].values[:-1] - df["cycle number"].values[1:] #変わり目だけ
+		#print(delta_Ns)
+		ends_indexes = np.append(np.where(delta_Ns == -1), [len(df["cycle number"].values)]) #-1が入っているところはそのcycleが終わるところ + データの一番最後
+
+		starts_indexes = np.append(0, ends_indexes+1)
+
+		CycleRange = namedtuple("Cyclerange", ["begin", "end"])
+		cycle_range_list: list[CycleRange] = []
+		
+		for i in range(len(starts_indexes)-1):
+			cycle_range_list.append(
+				CycleRange(starts_indexes[i], ends_indexes[i])
+				)
+		
+		ca_list:list[ec.ChronoAmperogram] = []
+		for i, cycle_range in enumerate (cycle_range_list):
+			#print(cycle_range)
+			ca_list.append(
+				ec.ChronoPotentiogramn(
+					_comment = ["file: "+cmn.extract_filename(file_path)+"[{}]".format(i)],
+					_condition =condition,
+					_original_file_path = file_path,
+					_data_name = cmn.extract_filename(file_path),
+					_time = cmn.TimeArray(np.array(df["time/s"][cycle_range.begin:cycle_range.end])),
+					_potential = ec.PotentialArray(np.array(df["<Ewe/V>"][cycle_range.begin:cycle_range.end])),
+					_potential_CE = ec.PotentialArray(np.array(df["<Ece>/V"][cycle_range.begin:cycle_range.end])),
+					_current = ec.CurrentArray(np.array(df["I/mA"][cycle_range.begin:cycle_range.end]))
+				)
+			)
+		return BiologicCPData(
+			
+			cmn.DataArray[ec.ChronoPotentiogramn](ca_list),
+			_comment = ["file: "+cmn.extract_filename(file_path)],
+			_condition = condition,
+			_file_path = file_path,
+			_data_name = cmn.extract_filename(file_path)
+			)
+	
+	pass
+
 def load_biologic_CV(
 		file_path: str, 
 		reference_electrode: Optional[ec.ReferenceElectrode] = None,

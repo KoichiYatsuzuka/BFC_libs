@@ -573,7 +573,74 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
 			_current = df["current"]
 		)
 	
-
+"""
+To do
+to_data_frame関連の引数を修正
+"""
+@dataclass(frozen=True, repr=False)
+class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
+	
+	_time : cmn.TimeArray
+	@property
+	def time(self):
+		return self._time
+	
+	_potential: PotentialArray
+	@property
+	def potential(self):
+		return self._potential
+	
+	_potential_CE: PotentialArray
+	@property
+	def potential_CE(self):
+		return self._potential_CE
+	
+	
+	_current: CurrentArray
+	@property
+	def current(self):
+		return self._current
+	
+	@property
+	def x(self):
+		return self._time
+	
+	@property
+	def y(self):
+		return self._current
+	
+	def to_data_frame(self) -> pd.DataFrame:
+		return pd.DataFrame(
+            np.stack([
+                self._time.float_array(),
+                self._current.float_array(),
+				self._potential.float_array()
+            ], 1),
+            columns = [
+                "time",
+                "current",
+				"potential"
+            ]
+		)
+	
+	@classmethod
+	def from_data_frame(
+		cls, 
+		df: pd.DataFrame, 
+		comment: list[str] = [], 
+		condition: list[str] = [], 
+		original_file_path: str = "",
+		) -> Self:
+		
+		return ChronoAmperogram(
+			_comment = comment,
+			_condition = condition,
+			_original_file_path = original_file_path,
+			_data_name = f"Generated from dataframe({cmn.extract_filename(original_file_path)})",
+			_time = df["time"],
+			_potential = df["potential"],
+			_current = df["current"]
+		)
 
 #---------------------------------------------------------------
 #functions

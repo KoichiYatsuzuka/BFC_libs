@@ -214,9 +214,9 @@ class ValueObject:
 	@immutator
 	def __truediv__(self, dived_value: Union[int, float, Self]):
 		# error
-		if type(dived_value)!=int and type(dived_value)!= float and type(dived_value)!= type(self):
+		if not(type(dived_value) in OPERATION_ALLOWED_TYPES) and type(dived_value)!= type(self):
 			error_report = \
-				NOT_ALLOWED_ERROR_STR.format(str(Union[float, int, type(self)]), str(type(dived_value))).\
+				NOT_ALLOWED_ERROR_STR.format(str(str(OPERATION_ALLOWED_TYPES)), str(type(dived_value))).\
 				replace("<", "").replace(">", "")
 			raise TypeError(error_report)
 		

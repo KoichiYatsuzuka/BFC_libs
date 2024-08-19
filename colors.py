@@ -24,6 +24,16 @@ class Color:
         self.r = r
         self.g = g
         self.b = b
+
+    @classmethod
+    def from_color_code(cls, color_code: str):
+        try:
+            r =  int(color_code[1:3], 16)
+            g =  int(color_code[3:5], 16)
+            b =  int(color_code[5:7], 16)
+        except ValueError:
+            raise ValueError("An invalid color code was tried tconversion. code: {}".format(color_code))
+        return Color(r/255, g/255, b/255)
     
     def __call__(self)->tuple[float, float, float]:
         return (self.r, self.g, self.b)
