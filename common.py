@@ -9,14 +9,14 @@ from numpy._typing import NDArray
 from typing import Any, Literal, Optional, SupportsIndex
 from typing import Union, NewType, Self
 from typing import Generic, TypeVar, TypeAlias, Final, cast
-from typing import overload, Type, ClassVar
+from typing import overload, Type, ClassVar, Generator
 from dataclasses import dataclass
 import abc
 import matplotlib.pyplot as plt
 from copy import deepcopy as copy
 from functools import wraps
-import inspect
-from numba import jit
+#import inspect
+#from numba import jit
 
 
 #------------------------------------------------------
@@ -542,7 +542,7 @@ class DataArray(np.ndarray, Generic[T]):
 	def __getitem__(self, slice)->T:
 		return np.ndarray.__getitem__(self, slice)
 	
-	def __iter__(self)->T:
+	def __iter__(self)->Generator[T, None, None]:
 		return np.ndarray.__iter__(self)
 	
 	def map(self, function: function, *args, **kargs):

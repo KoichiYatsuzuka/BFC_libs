@@ -62,6 +62,13 @@ class BioLogicVoltammogramData(cmn.DataFile):
 
 @dataclass(frozen=True)
 class BiologicEISData(cmn.DataFile[ec.EIS]):
+
+	_eis_ce_re: cmn.DataArray[ec.EIS]
+	
+
+	_eis_we_ce: cmn.DataArray[ec.EIS]
+
+
 	""""""
 	"""_eis: EIS
 
@@ -86,9 +93,13 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 		cycle_border_list.append(len(df["Ns"])-1)
 		"""
 		
-		delta_Ns = df["Ns"].values[:-1] - df["Ns"].values[1:] #変わり目だけ
+		"""	delta_Ns = df["Ns"].values[:-1] - df["Ns"].values[1:] #変わり目だけ
 		#print(delta_Ns)
 		ends_indexes = np.append(np.where(delta_Ns == -1), [len(df["Ns"].values)]) #-1が入っているところはそのcycleが終わるところ + データの一番最後
+		"""
+		delta_Ns = df["cycle number"].values[:-1] - df["cycle number"].values[1:] #変わり目だけ
+		#print(delta_Ns)
+		ends_indexes = np.append(np.where(delta_Ns == -1), [len(df["cycle number"].values)]) #-1が入っているところはそのcycleが終わるところ + データの一番最後
 
 		starts_indexes = np.append(0, ends_indexes+1)
 
