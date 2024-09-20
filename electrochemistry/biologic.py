@@ -63,10 +63,10 @@ class BioLogicVoltammogramData(cmn.DataFile):
 @dataclass(frozen=True)
 class BiologicEISData(cmn.DataFile[ec.EIS]):
 
-	_eis_ce_re: cmn.DataArray[ec.EIS]
+	"""_eis_ce_re: cmn.DataArray[ec.EIS]
 	
 
-	_eis_we_ce: cmn.DataArray[ec.EIS]
+	_eis_we_ce: cmn.DataArray[ec.EIS]"""
 
 
 	""""""
