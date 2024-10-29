@@ -4,11 +4,14 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from typing import Optional, Self
+from typing import Optional, Self, Final
 from dataclasses import dataclass
 
 from .. import common as cmn
 from .. common import ValueObject, ValueObjectArray
+
+COLUMN_NAME_WAVENUMBER: Final[str] = "wavenumber"
+COLUMN_NAME_INTENSITY:Final[str] = "intensity"
 
 class Wavenumber(cmn.ValueObject):
     pass
@@ -68,8 +71,8 @@ class RamanSpectrum(cmn.DataSeriese[Wavenumber, RammanIntensity]):
                 self._intensity.float_array()
             ], 1),
             columns = [
-                "wavenumber",
-                "intensity"
+                COLUMN_NAME_WAVENUMBER,
+                COLUMN_NAME_INTENSITY
             ]
         )
     

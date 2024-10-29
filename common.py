@@ -15,6 +15,7 @@ import abc
 import matplotlib.pyplot as plt
 from copy import deepcopy as copy
 from functools import wraps
+import codecs
 #import inspect
 #from numba import jit
 
@@ -394,9 +395,9 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
 		return out
 
 	#@immutator
-	def normalize(self)->Self:
+	def normalize(self, begin_index=None, end_index=None)->Self:
 		""""""
-		"""match begin_index:
+		match begin_index:
 			case None:
 				_begin_index = 0
 			case _:
@@ -406,9 +407,13 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
 			case None:
 				_end_index = len(self)-1
 			case _:
-				_end_index = end_index"""
+				_end_index = end_index
+		
+		sliced_array = self[_begin_index:_end_index]
+		max_value = sliced_array.max()
+		min_value = sliced_array.min()
 
-		normd_value: ValueObjectArray = (self-self.min())/(self.max()-self.min())
+		normd_value: ValueObjectArray = (self-min_value)/(max_value-min_value)
 		normd_value.meta = normd_value.meta.removesuffix("_subtract_divide")+"_normalized"
 		return normd_value
 	
@@ -564,7 +569,14 @@ class DataArray(np.ndarray, Generic[T]):
 			tmp_list.append(copy(tmp))
 		
 		return DataArray[T](tmp_list)
-		pass
+	
+	@immutator
+	def join(self, another: Self)->Self:
+		if type(another) != type(self):
+			raise TypeError
+
+		joined_ndarray = np.append(self, another)
+		return type(self)(joined_ndarray)
 	
 
 @dataclass(frozen=True)
@@ -968,7 +980,7 @@ def find_line_with_key(
 	None: the key word was not found.
 	"""
 	# Reading each line with finding the key word
-	file = open(file_path, 'r', encoding=encoding)
+	file = codecs.open(file_path, 'r', encoding=encoding, errors='ignore')
 	lines = file.readlines()
 	file.close()
 

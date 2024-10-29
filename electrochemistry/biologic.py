@@ -97,11 +97,15 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 		#print(delta_Ns)
 		ends_indexes = np.append(np.where(delta_Ns == -1), [len(df["Ns"].values)]) #-1が入っているところはそのcycleが終わるところ + データの一番最後
 		"""
-		delta_Ns = df["cycle number"].values[:-1] - df["cycle number"].values[1:] #変わり目だけ
+		"""delta_Ns = df["cycle number"].values[:-1] - df["cycle number"].values[1:] #変わり目だけ
 		#print(delta_Ns)
 		ends_indexes = np.append(np.where(delta_Ns == -1), [len(df["cycle number"].values)]) #-1が入っているところはそのcycleが終わるところ + データの一番最後
 
-		starts_indexes = np.append(0, ends_indexes+1)
+		starts_indexes = np.append(0, ends_indexes+1)"""
+		starts_indexes = np.append(0, np.where(df["Ns changes"].values == 1))
+		print(starts_indexes)
+		ends_indexes = np.append(starts_indexes[1:]-1, len(df["Ns changes"].values))
+		print(ends_indexes)
 
 		CycleRange = namedtuple("Cyclerange", ["begin", "end"])
 		cycle_range_list: list[CycleRange] = []
@@ -122,7 +126,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 					_data_name = cmn.extract_filename(file_path),
 					_time = cmn.TimeArray(np.array(df["time/s"][cycle_range.begin:cycle_range.end])),
 					_potential = ec.PotentialArray(np.array(df["Ewe/V"][cycle_range.begin:cycle_range.end])),
-					_current = ec.CurrentArray(np.array(df["<I>/mA"][cycle_range.begin:cycle_range.end]))
+					_current = ec.CurrentArray(np.array(df["<I>/mA"][cycle_range.begin:cycle_range.end]))/1000, # mA->A
 				)
 			)
 		return BiologicCAData(
@@ -137,7 +141,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 	pass
 
 @dataclass(frozen=True)
-class BiologicCPData(cmn.DataFile[ec.ChronoAmperogram]):
+class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogramn]):
 	
 	@classmethod
 	def load_file(cls, file_path: str):
@@ -166,7 +170,7 @@ class BiologicCPData(cmn.DataFile[ec.ChronoAmperogram]):
 				CycleRange(starts_indexes[i], ends_indexes[i])
 				)
 		
-		ca_list:list[ec.ChronoAmperogram] = []
+		ca_list:list[ec.ChronoPotentiogramn] = []
 		for i, cycle_range in enumerate (cycle_range_list):
 			#print(cycle_range)
 			ca_list.append(
@@ -177,8 +181,9 @@ class BiologicCPData(cmn.DataFile[ec.ChronoAmperogram]):
 					_data_name = cmn.extract_filename(file_path),
 					_time = cmn.TimeArray(np.array(df["time/s"][cycle_range.begin:cycle_range.end])),
 					_potential = ec.PotentialArray(np.array(df["<Ewe/V>"][cycle_range.begin:cycle_range.end])),
-					_potential_CE = ec.PotentialArray(np.array(df["<Ece>/V"][cycle_range.begin:cycle_range.end])),
-					_current = ec.CurrentArray(np.array(df["I/mA"][cycle_range.begin:cycle_range.end]))
+					#_potential_CE = ec.PotentialArray(np.array(df["<Ece>/V"][cycle_range.begin:cycle_range.end])),
+					_current = ec.CurrentArray(np.array(df["I/mA"][cycle_range.begin:cycle_range.end]))/1000, # mA->A
+					_other_data = df.drop(["time/s", "<Ewe/V>", "I/mA"], axis=1)
 				)
 			)
 		return BiologicCPData(

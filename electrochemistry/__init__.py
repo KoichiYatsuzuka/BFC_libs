@@ -573,6 +573,19 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
 			_current = df["current"]
 		)
 	
+	@cmn.immutator
+	def IR_correction(self, resistance: Registance):
+		new_ammperogram = ChronoAmperogram(
+			_potential = self.potential - self.current.iR_correction(resistance),
+			_current = self.current,
+			_data_name = self.data_name + "_iR_corrected_"+str(resistance)+"Ohm",
+			_others_data = self.others_data,
+			_time = self.time,
+			_comment = self.comment,
+			_condition = self.condition,
+			_original_file_path= self._original_file_path
+		)
+		return new_ammperogram
 """
 To do
 to_data_frame関連の引数を修正
@@ -590,16 +603,21 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 	def potential(self):
 		return self._potential
 	
-	_potential_CE: PotentialArray
+	"""_potential_CE: PotentialArray
 	@property
 	def potential_CE(self):
-		return self._potential_CE
+		return self._potential_CE"""
 	
 	
 	_current: CurrentArray
 	@property
 	def current(self):
 		return self._current
+	
+	_other_data: pd.DataFrame
+	@property
+	def other_data(self):
+		return self._other_data
 	
 	@property
 	def x(self):
@@ -641,6 +659,20 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 			_potential = df["potential"],
 			_current = df["current"]
 		)
+	
+	@cmn.immutator
+	def IR_correction(self, resistance: Registance):
+		new_ammperogram = ChronoPotentiogramn(
+			_potential = self.potential - self.current.iR_correction(resistance),
+			_current = self.current,
+			_data_name = self.data_name + "_iR_corrected_"+str(resistance)+"Ohm",
+			_other_data = self.other_data,
+			_time = self.time,
+			_comment = self.comment,
+			_condition = self.condition,
+			_original_file_path= self._original_file_path
+		)
+		return new_ammperogram
 
 #---------------------------------------------------------------
 #functions
