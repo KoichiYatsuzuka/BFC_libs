@@ -24,27 +24,84 @@ import scipy.optimize as opt
 from copy import deepcopy as copy
 from dataclasses import dataclass
 
-from typing import Union,NewType, Optional
+from typing import Union,NewType, Optional, Self, TypeVar, Generic
 import abc
 
 import BFC_libs.common as cmn
 
-float_like = Union[int, float, np.float64, cmn.ValueObject]
+#float_like = Union[int, float, np.float64, cmn.ValueObject]
 ndarray_like = Union[list[float], np.ndarray, cmn.ValueObjectArray]
-params = list[float]
+#params = list[float]
 
+class ValueWithRange:
+    "a virtual class"
+    value: float
 
-class FittingFunctionElement(metaclass=abc.ABCMeta):
-    
-    def params(self)->tuple[float_like]:
+    def __float__(self):
+        return self.value
+
+    def print(self):
+        raise(TypeError)
         pass
-    
+
+class ValueWithBounds(ValueWithRange):
+    least: Optional[float]
+    most: Optional[float]
+
+    def __init__(self, _value: float, _least: Optional[float]= None, _most: Optional[float]=None):
+        
+        if _least is not None and _least > _value:
+            raise ValueError("least bound ({}) is more than x0({})".format(_least, _value)) 
+        
+        if _most is not None and _most < _value:
+            raise ValueError("most bound ({}) is less than x0({})".format(_most, _value))
+
+        self.value = _value
+        self.least = _least
+        self.most = _most
+        
+        if _value is None:
+            raise ValueError("None is substituted for the main fitting parameter")
+    def print(self):
+        print(("{:.3e} - ".format(self.least) if self.least is not None else "No min bound - ")+\
+            "{:.3e} - ".format(self.value)+\
+            ("{:.3e}".format(self.most) if self.most is not None else "No max bound")
+        )
+
+class ValueWithErrror(ValueWithRange):
+    def __init__(self, _value: float, _error: float):
+        if _value is None:
+            raise ValueError("None is substituted for the main fitting parameter")
+        
+        self.value = _value
+        self.error = _error
+        
+    def print(self):
+        print("{:.3e} ± {:.3e}".format(self.value, self.error))
+
+ValType = TypeVar("T", ValueWithBounds, ValueWithErrror)
+Param = ValueWithBounds
+
+class FittingFunctionElement(Generic[ValType], metaclass=abc.ABCMeta):
+
+    @classmethod
+    def func_name(cls)->str:
+        return cls.__name__
+        pass
+        
+    def params(self)->Union[ValType, tuple[ValType]]:
+        pass
+
+    @classmethod
+    def para_names(self)->list[str]:
+        pass
+
     @property
     def para_len(self)->int:
         params = self.params()
         if type(params) == tuple:
             return len(params)
-        elif isinstance(params, float_like):
+        elif isinstance(params, ValueWithRange):
             return 1
         else:
             raise TypeError("The type of parameter is invalid: {}".format(type(params)))
@@ -56,11 +113,44 @@ class FittingFunctionElement(metaclass=abc.ABCMeta):
     def __call__(self, x: ndarray_like)->ndarray_like:
         return self.calc(x)
     
-    pass
+    """def show_with_err(self, error: Self)->None:
+        pass"""
+
+    """def _print_params_and_errs(
+        self, 
+        name: str, 
+        para_names: list[str],
+        errs: Self)->None:
+        
+        print("function: "+name)
+        try:
+            for i, para in enumerate(self.params()):
+                print("{}: {:.3e}".format(para_names[i], para)+" ± " + "{:.2e}".format(errs.params()[i]))
+        except(TypeError): #paramsが一個の時、返り値がiterableでない
+            print("{}: {:.3e}".format(para_names[0],self.params())+" ± " + "{:.2e}".format(errs.params()))
+
+        print("--")
+        return"""
+    
+    def print_params(self):
+        print("function: " + self.func_name())
+        try:
+            for i, para in enumerate(self.params()):
+                print(self.para_names()[i]+": ", end="")
+                para.print()
+        except(TypeError): #paramsが一個の時、返り値がiterableでない
+            para = self.params()
+            print(self.para_names()[0]+": ", end="")
+            para.print()
+        print("--")
 
 
-def to_float_tuples(funcs: list[FittingFunctionElement])->list[tuple[float_like]]:
-    params: list[tuple[float]] = []
+    
+    def to_result_type(self):
+        return Self[ValueWithErrror]
+
+def to_float_tuples(funcs: list[FittingFunctionElement])->list[tuple[ValType]]:
+    params: list[tuple[ValType]] = []
     for func in funcs:
         if not hasattr(func.params(), "__iter__"):
             params.append(func.params())
@@ -70,20 +160,21 @@ def to_float_tuples(funcs: list[FittingFunctionElement])->list[tuple[float_like]
     return params
 
 
-class TotalFunc:
-    func_components: list[FittingFunctionElement]
-    minimum_bounds: Optional[list[FittingFunctionElement]]
-    maximum_bounds: Optional[list[FittingFunctionElement]]
+
+class TotalFunc(Generic[ValType]):
+    func_components: list[FittingFunctionElement[ValType]]
+    #minimum_bounds: Optional[list[FittingFunctionElement]]
+    #maximum_bounds: Optional[list[FittingFunctionElement]]
 
     def __init__(
             self, 
             func_components: list[FittingFunctionElement],
-            minimum_bounds: Optional[list[FittingFunctionElement]] = None,
-            maximum_bounds: Optional[list[FittingFunctionElement]] = None
+            #minimum_bounds: Optional[list[FittingFunctionElement]] = None,
+            #maximum_bounds: Optional[list[FittingFunctionElement]] = None
     ):
         self.func_components = func_components
-        self.minimum_bounds = minimum_bounds
-        self.maximum_bounds = maximum_bounds
+        #self.minimum_bounds = minimum_bounds
+        #self.maximum_bounds = maximum_bounds
 
 
     def calc(self, x: np.ndarray):
@@ -96,7 +187,24 @@ class TotalFunc:
         return self.calc(x)
     
     
-    
+    def parameter_to_tuples(self)->list[tuple[float]]:
+        params: list[tuple[ValType]] = []
+        for func in self.func_components:
+            if not hasattr(func.params(), "__iter__"):
+                params.append(func.params().value)
+            else:
+                for param in func.params():
+                    params.append(param.value)
+        return params
+        pass
+
+    def print(self):
+        for func in self.func_components:
+            func.print_params()
+
+        
+
+class FittingParameters(TotalFunc[ValueWithBounds]):
     def fit_func(self):
 
         def func(x, *params):
@@ -108,23 +216,67 @@ class TotalFunc:
             for i, func in enumerate(self.func_components):
                 sliced_params = []
                 for j in range(0, func.para_len):
-                    sliced_params.append(params[para_index])
+                    sliced_params.append(ValueWithBounds(params[para_index]))
                     para_index+=1
                 #print(x)        
                 sum += type(func)(*sliced_params)(np.array(x))
             return sum
     
         return func
-   
 
-FittingResult = NewType("FittingResult", TotalFunc)
+    def minimum_bounds_to_tuples(self)->list[tuple[Optional[float]]]:
+            params: list[tuple[ValueWithBounds]] = []
+            for func in self.func_components:
+                if not hasattr(func.params(), "__iter__"):
+                    params.append(func.params().least)
+                else:
+                    for param in func.params():
+                        
+                        params.append(param.least)
+            return params
+    
+    def maximum_bounds_to_tuples(self)->list[tuple[Optional[float]]]:
+            params: list[tuple[ValueWithBounds]] = []
+            for func in self.func_components:
+                if not hasattr(func.params(), "__iter__"):
+                    params.append(func.params().most)
+                else:
+                    for param in func.params():
+                        
+                        params.append(param.most)
+            return params
 
+    """minimum_bounds: Optional[list[FittingFunctionElement]]
+    maximum_bounds: Optional[list[FittingFunctionElement]]
+
+    def __init__(
+            self, 
+            func_components: list[FittingFunctionElement],
+            minimum_bounds: Optional[list[FittingFunctionElement]] = None,
+            maximum_bounds: Optional[list[FittingFunctionElement]] = None
+    ):
+        self.func_components = func_components
+        self.minimum_bounds = minimum_bounds
+        self.maximum_bounds = maximum_bounds"""
+
+class FittingResult(TotalFunc[ValueWithErrror]):
+
+    """error: list[FittingFunctionElement]
+
+    def __init__(self,
+        func_components: list[FittingFunctionElement],
+        error: list[FittingFunctionElement]):
+
+        self.func_components = func_components
+        self.error = error
+        pass"""
+    
 
 def fitting(
         x, 
         y, 
-        func_and_initial_params: TotalFunc
-        )->tuple[FittingResult, list[FittingFunctionElement]]:
+        func_and_initial_params: FittingParameters
+        )->FittingResult:
     """
     
     """
@@ -140,7 +292,7 @@ def fitting(
                 params.append(param)
         #func_list.append(func.calc)
     
-    params = to_float_tuples(func_and_initial_params.func_components)
+    """params = to_float_tuples(func_and_initial_params.func_components)
     if func_and_initial_params.minimum_bounds is None:
         minimums = None
     else:
@@ -149,8 +301,13 @@ def fitting(
     if func_and_initial_params.maximum_bounds is None:
         maximums = None
     else:
-        maximums = to_float_tuples(func_and_initial_params.maximum_bounds)
+        maximums = to_float_tuples(func_and_initial_params.maximum_bounds)"""
     
+    params = func_and_initial_params.parameter_to_tuples()
+
+    max_bounds = func_and_initial_params.maximum_bounds_to_tuples()
+    min_bounds = func_and_initial_params.minimum_bounds_to_tuples()
+    #print(max_bounds, min_bounds)
     """def total_fit_func(x, *params):
         #print(params)
         sum :np.ndarray =0.0
@@ -166,48 +323,62 @@ def fitting(
         return sum"""
     
     #print(params)
+    
+    #ここでフィッティング
     opt_para, covariance = opt.curve_fit(
         func_and_initial_params.fit_func(),
         x, 
         y, 
-        bounds=(minimums, maximums),
+        bounds=(min_bounds, max_bounds),
         p0 = params, 
-        maxfev = 10000
+        maxfev = 100000
         )
+    err = np.sqrt(np.diag(covariance)) #謎の行列から標準誤差取得（公式ドキュメントのいうがまま）
 
     opt_func_list = []
+    #err_list = []
     para_index = 0
+    opt_res: list[ValueWithErrror] = []
+
+    for i, _ in enumerate(opt_para):
+        opt_res.append(ValueWithErrror(opt_para[i], err[i]))
+    
     for i, func in enumerate(func_and_initial_params.func_components):
-        func_type = type(func)
-        opt_para_sliced = opt_para[para_index:para_index+func.para_len]
+        func_type = type(func)[ValueWithErrror]
+        
+        """opt_para_sliced = opt_para[para_index:para_index+func.para_len]
+        err_sliced = err[para_index:para_index+func.para_len]"""
+
+        opt_res_sliced = opt_res[para_index:para_index+func.para_len]
+
         #print(opt_para_sliced)
-        opt_func_list.append(func_type(*opt_para_sliced))
+        """opt_func_list.append(func_type(*opt_para_sliced))
+        err_list.append(func_type(*err_sliced))"""
+        opt_func_list.append(func_type(*opt_res_sliced))
+
         para_index += func.para_len
     
-    fit_res = TotalFunc(opt_func_list, func_and_initial_params.minimum_bounds, func_and_initial_params.maximum_bounds)
+    fit_res = FittingResult(opt_func_list)
     #print(fit_res)
 
-    err = np.sqrt(np.diag(covariance))
 
-    
-
-    return (fit_res, err)
+    return fit_res
 
 #--------------------------------peak functions--------------------------------
 
 @dataclass(frozen=True)
-class PeakFunction(FittingFunctionElement, metaclass=abc.ABCMeta):
-    _center: float_like
+class PeakFunction(FittingFunctionElement[ValType], metaclass=abc.ABCMeta):
+    _center: ValType
     @property
     def center(self):
         return self._center
     
-    _width: float_like
+    _width: ValType
     @property
     def width(self):
         return self._width
     
-    _ampletude: float_like
+    _ampletude: ValType
     @property
     def ampletude(self):
         return self._ampletude
@@ -219,68 +390,116 @@ class PeakFunction(FittingFunctionElement, metaclass=abc.ABCMeta):
     def calc(self, x: ndarray_like)->ndarray_like:
         pass
     
+
     pass
 
-class LorentzPeak(PeakFunction):
+class LorentzPeak(PeakFunction[ValType]):
+    """def show_with_err(self, error: Self) -> None:
+        func_name = "Lorentzian peak"
+        para_names = ["center", "width", "amplitude"]
+
+
+        self._print_params_and_errs(func_name, para_names, error)
+        return"""
+        
     def calc(self, x: ndarray_like)->ndarray_like:
-        return 1/np.pi * self._width/((x-self._center)**2 + self._width**2) * self._ampletude
+        return 1/np.pi * self._width.value/((x-self._center.value)**2 + self._width.value**2) * self._ampletude.value
     
-class GaussianPeak(PeakFunction):
+class GaussianPeak(PeakFunction[ValType]):
+    """def show_with_err(self, error: Self) -> None:
+        func_name = "Gaussian peak"
+        para_names = ["center", "width", "amplitude"]
+
+
+        self._print_params_and_errs(func_name, para_names, error)"""
     def calc(self, x: ndarray_like)->ndarray_like:
-        sigma = self._width /2  / np.sqrt(2*np.log(2))
-        return np.exp(-(x - self._center)**2 / 2/sigma**2)/ np.sqrt(2*np.pi) / sigma * self._ampletude
+        sigma = self._width.value /2  / np.sqrt(2*np.log(2))
+        return np.exp(-(x - self._center.value)**2 / 2/sigma**2)/ np.sqrt(2*np.pi) / sigma * self._ampletude.value
 
 #--------------------------------linear and poly--------------------------------
 
 @dataclass(frozen=True)
-class Constant(FittingFunctionElement):
-    value: float_like
+class Constant(FittingFunctionElement[ValType]):
+    value: ValType
+
+    """def show_with_err(self, error: Self) -> None:
+        func_name = "Constant"
+        para_names = ["constant"]
 
 
+        self._print_params_and_errs(func_name, para_names, error)
+        return"""
+    
     def params(self):
         return (self.value)
+    
+    def para_names(self):
+        return ["constant"]
 
     def calc(self, x: cmn.ValueObjectArray) -> cmn.ValueObjectArray:
-        return self.value
+        return self.value.value
+    
 
 @dataclass(frozen=True)
-class Linear(FittingFunctionElement):
-    slope: float_like
-    #y_intercept: float_like
+class Linear(FittingFunctionElement[ValType]):
+    slope: ValType
+    #y_intercept: ValType
+    """def show_with_err(self, error: Self) -> None:
+        func_name = "Linear"
+        para_names = ["slope"]
 
+
+        self._print_params_and_errs(func_name, para_names, error)
+        return"""
+    
+    def para_names(self):
+        return ["slope"]
 
     def params(self):
-        return (self. slope)
+        return (self.slope)
 
     def calc(self, x: cmn.ValueObjectArray)->cmn.ValueObjectArray:
-        return self.slope * x
+        return self.slope.value * x
     
 #--------------------------------exponentials--------------------------------
 
 @dataclass(frozen = True)
-class Exponential(FittingFunctionElement):
-    tau: float_like
-    amplitude : float_like
+class Exponential(FittingFunctionElement[ValType]):
+    tau: ValType
+    amplitude : ValType
 
-    
+    """def show_with_err(self, error: Self) -> None:
+        func_name = "Exponential"
+        para_names = ["tau", "amplitude"]
+
+
+        self._print_params_and_errs(func_name, para_names, error)
+
+        return"""
     def params(self):
         return (self.tau, self.amplitude)
     
     def calc(self, x: cmn.ValueObjectArray)->cmn.ValueObjectArray:
-        return self.amplitude * np.e ** ( x * -1 / self.tau)
+        return self.amplitude.value * np.e ** ( x * -1 / self.tau.value)
+    
+    def para_names(self):
+        return ["tau", "amplitude"]
     
 
 #-----------------------------------sigmoids--------------------------------
 @dataclass(frozen=True)
-class Sigmoid(FittingFunctionElement):
-    center: float_like
-    gain: float_like
-    hieght: float_like
+class Sigmoid(FittingFunctionElement[ValType]):
+    center: ValType
+    gain: ValType
+    hieght: ValType
 
     
     def params(self):
         return (self.center, self.gain, self.hieght)
     
     def calc(self, x:cmn.ValueObjectArray)->cmn.ValueObjectArray:
-        return self.hieght * (np.tanh(self.gain * x /2) + 1)/2
+        return self.hieght.value * (np.tanh(self.gain.value * x /2) + 1)/2
     
+    def para_names(self):
+        return ["center", "gain", "hieght"]
+     

@@ -743,7 +743,7 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
 	@property
 	def comment(self):
 		return self._comment
-	
+		
 	@property
 	def original_file_path(self):
 		return self._original_file_path
@@ -761,9 +761,18 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
 		)->Self:
 		raise AttributeError("This method must be overrided")
 	
+	def to_csv(self, file_path: str):
+		self.to_data_frame().to_csv(path_or_buf=file_path, encoding="UTF-8", index=False)
+		return
 
 	@immutator
-	def slice(self, x_min: X, x_max: X)->Self:
+	def slice(self, x_min: Optional[X] = None, x_max: Optional[X] = None)->Self:
+		if x_min is None:
+			x_min = self.x[0]
+
+		if x_max is None:
+			x_max = self.x[-1]
+		
 		try:
 			if x_min < self.x.min() or x_max > self.x.max():
 				raise ValueError(

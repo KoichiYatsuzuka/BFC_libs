@@ -532,6 +532,11 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
 	def current(self):
 		return self._current
 	
+	_other_data: pd.DataFrame
+	@property
+	def other_data(self):
+		return self._other_data
+	
 	@property
 	def x(self):
 		return self._time
@@ -552,6 +557,8 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
                 "current",
 				"potential"
             ]
+		).join(
+			self.other_data
 		)
 	
 	@classmethod
@@ -568,9 +575,10 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
 			_condition = condition,
 			_original_file_path = original_file_path,
 			_data_name = f"Generated from dataframe({cmn.extract_filename(original_file_path)})",
-			_time = df["time"],
-			_potential = df["potential"],
-			_current = df["current"]
+			_time = cmn.TimeArray(df["time"]),
+			_potential = PotentialArray(df["potential"]),
+			_current = CurrentArray(df["current"]),
+			_other_data = df.drop(columns=['time', 'potential', 'current'])
 		)
 	
 	@cmn.immutator
@@ -639,6 +647,8 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
                 "current",
 				"potential"
             ]
+		).join(
+			self.other_data
 		)
 	
 	@classmethod
@@ -655,9 +665,9 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 			_condition = condition,
 			_original_file_path = original_file_path,
 			_data_name = f"Generated from dataframe({cmn.extract_filename(original_file_path)})",
-			_time = df["time"],
-			_potential = df["potential"],
-			_current = df["current"]
+			_time = cmn.TimeArray(df["time"].values),
+			_potential = PotentialArray(df["potential"].values),
+			_current = CurrentArray(df["current"].values)
 		)
 	
 	@cmn.immutator
@@ -701,8 +711,8 @@ def convert_potential_reference(
 	)
 
 
-def mupltiply_current(
+"""def mupltiply_current(
 		voltammogram: Voltammogram,
 		multiplied_value: float
 )->Voltammogram:
-	pass
+	pass"""
