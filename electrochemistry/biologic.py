@@ -110,7 +110,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 		CycleRange = namedtuple("Cyclerange", ["begin", "end"])
 		cycle_range_list: list[CycleRange] = []
 		
-		for i in range(len(starts_indexes)-1):
+		for i in range(len(starts_indexes)):
 			cycle_range_list.append(
 				CycleRange(starts_indexes[i], ends_indexes[i])
 				)
@@ -167,7 +167,7 @@ class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogramn]):
 		CycleRange = namedtuple("Cyclerange", ["begin", "end"])
 		cycle_range_list: list[CycleRange] = []
 		
-		for i in range(len(starts_indexes)-1):
+		for i in range(len(starts_indexes)):
 			cycle_range_list.append(
 				CycleRange(starts_indexes[i], ends_indexes[i])
 				)
