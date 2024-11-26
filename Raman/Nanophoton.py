@@ -52,7 +52,7 @@ def read_peakfit_result(file_path: str):
 	return peak_data
 
 
-def read_1D_data(file_path: str)->Nanophoton1DDataFile:
+def read_1D_data(file_path: str, encoding = "Shift-JIS")->Nanophoton1DDataFile:
 
 
 	"""extension = common.extract_extension(file_path)
@@ -61,9 +61,9 @@ def read_1D_data(file_path: str)->Nanophoton1DDataFile:
 		return None"""
 
 	skip_line_num = \
-		cmn.find_line_with_key(file_path, "#\n")+1
+		cmn.find_line_with_key(file_path, "wn", encoding=encoding)
 	
-	file = open(file_path, 'r', encoding='Shift-JIS')
+	file = open(file_path, 'r', encoding=encoding)
 	conditions = file.readlines()[0:skip_line_num]
 	file.close()
 	

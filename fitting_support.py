@@ -82,7 +82,10 @@ class ValueWithErrror(ValueWithRange):
 ValType = TypeVar("T", ValueWithBounds, ValueWithErrror)
 Param = ValueWithBounds
 
+@dataclass(frozen=True)
 class FittingFunctionElement(Generic[ValType], metaclass=abc.ABCMeta):
+
+    name: Optional[str]
 
     @classmethod
     def func_name(cls)->str:
@@ -133,7 +136,10 @@ class FittingFunctionElement(Generic[ValType], metaclass=abc.ABCMeta):
         return"""
     
     def print_params(self):
-        print("function: " + self.func_name())
+        if self.name == "":
+            print("function: " + self.func_name())
+        else:
+            print("function: " + self.name)
         try:
             for i, para in enumerate(self.params()):
                 print(self.para_names()[i]+": ", end="")
@@ -219,7 +225,7 @@ class FittingParameters(TotalFunc[ValueWithBounds]):
                     sliced_params.append(ValueWithBounds(params[para_index]))
                     para_index+=1
                 #print(x)        
-                sum += type(func)(*sliced_params)(np.array(x))
+                sum += type(func)(func.name, *sliced_params)(np.array(x))
             return sum
     
         return func
@@ -275,7 +281,9 @@ class FittingResult(TotalFunc[ValueWithErrror]):
 def fitting(
         x, 
         y, 
-        func_and_initial_params: FittingParameters
+        func_and_initial_params: FittingParameters,
+        fitting_method = "lm",
+        sigma = 1,
         )->FittingResult:
     """
     
@@ -325,13 +333,16 @@ def fitting(
     #print(params)
     
     #ここでフィッティング
-    opt_para, covariance = opt.curve_fit(
+    opt_para, covariance, infodict, mesg, ier = opt.curve_fit(
         func_and_initial_params.fit_func(),
         x, 
         y, 
         bounds=(min_bounds, max_bounds),
         p0 = params, 
-        maxfev = 100000
+        maxfev = 100000,
+        method=fitting_method,
+        full_output=True,
+        sigma=sigma
         )
     err = np.sqrt(np.diag(covariance)) #謎の行列から標準誤差取得（公式ドキュメントのいうがまま）
 
@@ -354,14 +365,16 @@ def fitting(
         #print(opt_para_sliced)
         """opt_func_list.append(func_type(*opt_para_sliced))
         err_list.append(func_type(*err_sliced))"""
-        opt_func_list.append(func_type(*opt_res_sliced))
+        opt_func_list.append(func_type(func.name, *opt_res_sliced))
 
         para_index += func.para_len
     
     fit_res = FittingResult(opt_func_list)
     #print(fit_res)
 
-
+    print("nev = {}".format(infodict["nfev"]))
+    print("fvec = {}".format(infodict["fvec"][-1]))
+          
     return fit_res
 
 #--------------------------------peak functions--------------------------------
@@ -378,14 +391,18 @@ class PeakFunction(FittingFunctionElement[ValType], metaclass=abc.ABCMeta):
     def width(self):
         return self._width
     
-    _ampletude: ValType
+    _height: ValType
     @property
-    def ampletude(self):
-        return self._ampletude
+    def height(self):
+        return self._height
     
     
     def params(self):
-        return (self._center, self.width, self._ampletude)
+        return (self._center, self.width, self._height)
+
+    def para_names(self):
+        return ["peak center", "FWHM", "height"]
+
     
     def calc(self, x: ndarray_like)->ndarray_like:
         pass
@@ -403,7 +420,7 @@ class LorentzPeak(PeakFunction[ValType]):
         return"""
         
     def calc(self, x: ndarray_like)->ndarray_like:
-        return 1/np.pi * self._width.value/((x-self._center.value)**2 + self._width.value**2) * self._ampletude.value
+        return 1/np.pi * self._width.value**2/((x-self._center.value)**2 + self._width.value**2) * self.height.value
     
 class GaussianPeak(PeakFunction[ValType]):
     """def show_with_err(self, error: Self) -> None:
@@ -413,8 +430,30 @@ class GaussianPeak(PeakFunction[ValType]):
 
         self._print_params_and_errs(func_name, para_names, error)"""
     def calc(self, x: ndarray_like)->ndarray_like:
+        
         sigma = self._width.value /2  / np.sqrt(2*np.log(2))
-        return np.exp(-(x - self._center.value)**2 / 2/sigma**2)/ np.sqrt(2*np.pi) / sigma * self._ampletude.value
+        ampletude = self.height.value 
+
+        #return np.exp(-(x - self._center.value)**2 / 2/sigma**2)/ np.sqrt(2*np.pi) / sigma * self._ampletude.value
+        return np.exp(-(x - self._center.value)**2 / 2/sigma**2)*ampletude
+@dataclass(frozen=True)
+class GL_MixedPeak(PeakFunction[ValType]):
+
+    _GL_ratio: ValType
+    @property
+    def GL_ratio(self):
+        return self._GL_ratio
+
+    def params(self):
+        return (self._center, self._width, self._ampletude, self._GL_ratio)
+
+    def para_names(self):
+        return ["peak center", "FWHM", "area", "Gaussian-Lorentzian ratio"]
+
+    def calc(self, x: ndarray_like):
+        return self._GL_ratio.value*GaussianPeak("", self._center, self._width, self._ampletude).calc(x) + \
+            (1-self._GL_ratio.value)*LorentzPeak("", self._center, self._width, self._ampletude).calc(x)
+
 
 #--------------------------------linear and poly--------------------------------
 
@@ -503,3 +542,37 @@ class Sigmoid(FittingFunctionElement[ValType]):
     def para_names(self):
         return ["center", "gain", "hieght"]
      
+#------------------------------ocilating functions--------------------------
+@dataclass(frozen = True)
+class OscilatedExponential(FittingFunctionElement[ValType]):
+    
+    
+    _amplitude: ValType
+    @property
+    def amplitude(self):
+        return self._amplitude
+    
+    _tau: ValType
+    @property
+    def tau(self):
+        return self._tau
+
+    _period: ValType
+    @property
+    def period(self):
+        return self._period
+
+    _initial_phase: ValType
+    @property
+    def initial_phase(self):
+        return self._initial_phase
+    
+    
+    def params(self):
+        return (self.amplitude, self.tau, self.period, self.initial_phase)
+
+    def calc(self, x: ndarray_like):
+        return self.amplitude.value * np.sin(2*np.pi*x/self.period.value - self.initial_phase.value) * np.e ** ( x * -1 / self.tau.value)
+
+    def para_names(self):
+        return ["amplituide", "tau", "period", "initial_phase"]
