@@ -80,7 +80,7 @@ class Potential(ValueObject):
 	pass
 
 #PotentialArray= ValueObjectArray[Potential]
-class PotentialArray(ValueObjectArray):
+class PotentialArray(ValueObjectArray[Potential]):
 	def __new__(cls, obj, dtype=Potential, meta: Optional[str] = None):
 		
 		return super().__new__(cls, obj, dtype, meta)
@@ -97,7 +97,7 @@ class Registance(ValueObject):
 
 Impedance = Registance
 
-class ImpedanceArray(ValueObjectArray):
+class ImpedanceArray(ValueObjectArray[Impedance]):
 	def __new__(cls, obj, dtype=Impedance, meta: Optional[str] = None):
 		
 		return super().__new__(cls, obj, dtype, meta)
@@ -106,7 +106,7 @@ class ImpedanceArray(ValueObjectArray):
 class Frequency(ValueObject):
 	pass
 
-class FrequencyArray(ValueObjectArray):
+class FrequencyArray(ValueObjectArray[Frequency]):
 	def __new__(cls, obj, dtype=Frequency, meta: Optional[str] = None):
 		
 		return super().__new__(cls, obj, dtype, meta)
@@ -138,7 +138,7 @@ Ag/AgCl (Silver/Silver chloride electorde)
 def RHE(pH: float)->ReferenceElectrode:
 	""" Retruens -0.059*pH
 	"""
-	return -0.059*pH
+	return ReferenceElectrode(-0.059*pH)
 
 #---------------------------------------------------------------
 #Value object classes
@@ -440,7 +440,10 @@ class EIS(cmn.DataSeriese[Registance, Registance]):
 	def phase(self):
 		return self._phase"""
 
-	_others_data: pd.DataFrame
+	_other_data: pd.DataFrame
+	@property
+	def other_data(self)->pd.DataFrame:
+		return self._other_data
 
 	@property
 	def x(self):
@@ -452,17 +455,17 @@ class EIS(cmn.DataSeriese[Registance, Registance]):
 
 	def to_data_frame(self) -> pd.DataFrame:
 		return pd.DataFrame(
-			np.stack([
-				self._frequency.float_array(),
-				self._real_Z.float_array(),
-				self._imaginary_Z.float_array()
-			], 1),
-			columns = [
-				"frequency",
-				"real Z",
-				"imaginary Z"
-			]
-		)
+				np.stack([
+					self._frequency.float_array(),
+					self._real_Z.float_array(),
+					self._imaginary_Z.float_array()
+				], 1),
+				columns = [
+					"frequency",
+					"real Z",
+					"imaginary Z"
+				]
+			).join(self._other_data)
 	
 	@classmethod
 	def from_data_frame(
@@ -480,7 +483,10 @@ class EIS(cmn.DataSeriese[Registance, Registance]):
 			_real_Z = ImpedanceArray(df["real Z"]),
 			_imaginary_Z = ImpedanceArray(df["imaginary Z"]),
 			_frequency = df["frequency"],
-			_other_data = pd.DataFrame([]),
+			_other_data = pd.DataFrame(
+				df.drop(columns="frequency")\
+				.drop(columns= "real Z")\
+				.drop(columns="imaginary Z")),
 		)
 
 	def plot(self, fig: Optional[plt.Figure]=None, ax: Optional[plt.Axes]=None, **args)->tuple[plt.Figure, plt.Axes]:
@@ -495,7 +501,7 @@ class EIS(cmn.DataSeriese[Registance, Registance]):
 			_ax.axhline(0, linewidth = 1, color = "#303030")
 		#_ax.plot(self._real_Z, self._imaginary_Z)
 
-		if (self.get_resistance() != None):
+		if (self.get_resistance() is not None):
 			_ax.axvline(self.get_resistance().value, -0.2, 0.2, linestyle = "dotted")
 		
 
@@ -587,19 +593,21 @@ class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
 			_potential = self.potential - self.current.iR_correction(resistance),
 			_current = self.current,
 			_data_name = self.data_name + "_iR_corrected_"+str(resistance)+"Ohm",
-			_others_data = self.others_data,
+			_other_data = self.other_data,
 			_time = self.time,
 			_comment = self.comment,
 			_condition = self.condition,
 			_original_file_path= self._original_file_path
 		)
 		return new_ammperogram
+	
+	
 """
 To do
 to_data_frame関連の引数を修正
 """
 @dataclass(frozen=True, repr=False)
-class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
+class ChronoPotentiogram(cmn.DataSeriese[cmn.Time, Current]):
 	
 	_time : cmn.TimeArray
 	@property
@@ -660,7 +668,7 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 		original_file_path: str = "",
 		) -> Self:
 		
-		return ChronoAmperogram(
+		return ChronoPotentiogram(
 			_comment = comment,
 			_condition = condition,
 			_original_file_path = original_file_path,
@@ -672,7 +680,7 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 	
 	@cmn.immutator
 	def IR_correction(self, resistance: Registance):
-		new_ammperogram = ChronoPotentiogramn(
+		new_potentiogram = ChronoPotentiogram(
 			_potential = self.potential - self.current.iR_correction(resistance),
 			_current = self.current,
 			_data_name = self.data_name + "_iR_corrected_"+str(resistance)+"Ohm",
@@ -682,7 +690,87 @@ class ChronoPotentiogramn(cmn.DataSeriese[cmn.Time, Current]):
 			_condition = self.condition,
 			_original_file_path= self._original_file_path
 		)
-		return new_ammperogram
+		return new_potentiogram
+	
+	@cmn.immutator
+	def convert_potential_reference(
+			self, 
+			RE_before: ReferenceElectrode, 
+			RE_after: ReferenceElectrode):
+		"""
+		"""
+		RE_diff = RE_after-RE_before
+		new_potentiogram = ChronoPotentiogram(
+			_potential = self.potential-RE_diff,
+			_current = self.current,
+			_data_name = self.data_name + "_iR_corrected_"+str(RE_diff)+"V",
+			_other_data = self.other_data,
+			_time = self.time,
+			_comment = self.comment,
+			_condition = self.condition,
+			_original_file_path= self._original_file_path
+		)
+		return new_potentiogram
+	
+	@cmn.immutator
+	def modify(
+		self,
+		new_potential: Optional[Potential] = None,
+		new_current: Optional[Current] = None,
+		new_time: Optional[cmn.Time] = None,
+		new_others_data: Optional[np.ndarray] = None,
+		prefix_to_data_name: Optional[str] = None
+	):
+		tmp_prefix_candidate: str = "_"
+
+		if new_potential is None:
+			_new_potential = self._potential
+		else:
+			_new_potential = new_potential
+			tmp_prefix_candidate = tmp_prefix_candidate + "potential_mod_"
+			
+		
+		if new_current is None:
+			_new_current = self.current
+		else:
+			_new_current = new_current
+			tmp_prefix_candidate = tmp_prefix_candidate + "current_mod_"
+		
+
+			
+		if new_time is None:
+			_new_time = self.time
+		else:
+			_new_time = new_time
+		
+
+		if new_others_data is None:
+			_new_other_data = self.other_data
+		else:
+			_new_other_data = new_others_data
+			tmp_prefix_candidate = tmp_prefix_candidate + "others_mod_"
+
+
+		if prefix_to_data_name is None:
+			_prefix_to_data_name = tmp_prefix_candidate
+		else:
+			_prefix_to_data_name = prefix_to_data_name
+
+
+
+		return ChronoPotentiogram(
+			_comment = self._comment,
+			_condition = self._condition,
+			_original_file_path = self._original_file_path,
+			_data_name = _prefix_to_data_name + self._data_name,
+			_time = _new_time,
+			_potential = _new_potential,
+			_current = _new_current,
+			_other_data = _new_other_data
+		)
+
+
+
 
 #---------------------------------------------------------------
 #functions

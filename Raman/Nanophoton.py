@@ -64,10 +64,10 @@ def read_1D_data(file_path: str, encoding = "Shift-JIS")->Nanophoton1DDataFile:
 		cmn.find_line_with_key(file_path, "wn", encoding=encoding)
 	
 	file = open(file_path, 'r', encoding=encoding)
-	conditions = file.readlines()[0:skip_line_num]
+	conditions = file.readlines()[0:skip_line_num-1]
 	file.close()
 	
-	df = pd.read_csv(file_path, sep="\t", skiprows=skip_line_num)
+	df = pd.read_csv(file_path, sep="\t", skiprows=skip_line_num-1)
 
 	column_names=df.keys()
 

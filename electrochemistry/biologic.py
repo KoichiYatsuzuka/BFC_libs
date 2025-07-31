@@ -6,7 +6,7 @@ from .. import electrochemistry as ec
 
 from copy import deepcopy as copy
 from dataclasses import dataclass
-from typing import Union, Optional, Any
+from typing import Union, Optional, Any, Final
 from collections import namedtuple
 from nptyping import NDArray
 
@@ -17,6 +17,19 @@ from . import ReferenceElectrode, Registance, Voltammogram, Potential, Current, 
 from .. import electrochemistry as ec
 
 BiologicFileInfo = namedtuple("BiologicFileInfo", ['skip_line_num', 'conditions'])
+
+#------------------------------keys for DataFrame------------------------
+#------------------------geneal------------------------------
+KEY_POTENTIAL: Final[str] = "<Ewe>/V"
+KEY_CURRENT: Final[str] = "<I>/mA"
+
+#-----------------------EIS----------------------------------
+KEY_FREQUENCY:Final[str] = "freq/Hz"
+KEY_REAL_Z:Final[str] = "Re(Z)/Ohm"
+KEY_NEG_IMAGINARY_Z: Final[str] = "-Im(Z)/Ohm"
+KEY_ABS_Z: Final[str] = "|Z|/Ohm"
+KEY_R_PHASE_DEG: Final[str] = "Phase(Z)/deg" #degree
+
 
 def biologic_file_info(file_path)->BiologicFileInfo:
 	with open(file_path, 'r', encoding='UTF-8') as file:
@@ -62,6 +75,54 @@ class BioLogicVoltammogramData(cmn.DataFile):
 
 @dataclass(frozen=True)
 class BiologicEISData(cmn.DataFile[ec.EIS]):
+
+	@classmethod
+	def load_file(cls, file_path: str, encoding = "UTF-8"):
+		with open(file_path, 'r', encoding=encoding) as file:
+			raw_txt_lines = file.readlines()
+			num_skip_lines = int(raw_txt_lines[1][18:])-1
+
+		condition = raw_txt_lines[:num_skip_lines-1]
+		df = pd.read_csv(file_path, sep="\t", skiprows=num_skip_lines)
+
+
+		# preparing to slice CVs
+		cycle_border_list = [0]
+		for i in range(0, df["cycle number"].size-2):
+			if df["cycle number"][i] != df["cycle number"][i+1]:
+				cycle_border_list.append(i+1)
+		cycle_border_list.append(len(df["cycle number"])-1)
+
+		CycleRange = namedtuple("Cyclerange", ["begin", "end"])
+		cycle_range_list: list[CycleRange] = []
+		for i in range(len(cycle_border_list)-1):
+			cycle_range_list.append(
+				CycleRange(cycle_border_list[i], cycle_border_list[i+1]-1)
+				)
+			
+		eis_list = []
+
+		for i, cycle_range in enumerate (cycle_range_list):
+			tmp_eis = EIS(
+				_real_Z = ec.ImpedanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_imaginary_Z = ec.ImpedanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_frequency = ec.FrequencyArray(np.array(df["freq/Hz"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_data_name = "",
+				_other_data = df.drop(columns=["Re(Z)/Ohm", "-Im(Z)/Ohm", "freq/Hz"])[cycle_range.begin:cycle_range.end].reset_index(),
+				_comment = ["file: "+cmn.extract_filename(file_path)],
+				_condition = condition,
+				_original_file_path = file_path
+			)
+			eis_list.append(copy(tmp_eis))
+
+
+		return BiologicEISData(
+			_data = cmn.DataArray[EIS](eis_list),
+			_data_name = cmn.extract_filename(file_path),
+			_comment = ["file: "+cmn.extract_filename(file_path)],
+			_condition = condition,
+			_file_path = file_path
+		)
 
 	"""_eis_ce_re: cmn.DataArray[ec.EIS]
 	
@@ -142,7 +203,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 	pass
 
 @dataclass(frozen=True)
-class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogramn]):
+class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogram]):
 	
 	@classmethod
 	def load_file(cls, file_path: str):
@@ -172,11 +233,11 @@ class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogramn]):
 				CycleRange(starts_indexes[i], ends_indexes[i])
 				)
 		
-		ca_list:list[ec.ChronoPotentiogramn] = []
+		ca_list:list[ec.ChronoPotentiogram] = []
 		for i, cycle_range in enumerate (cycle_range_list):
 			#print(cycle_range)
 			ca_list.append(
-				ec.ChronoPotentiogramn(
+				ec.ChronoPotentiogram(
 					_comment = ["file: "+cmn.extract_filename(file_path)+"[{}]".format(i)],
 					_condition =condition,
 					_original_file_path = file_path,
@@ -190,7 +251,7 @@ class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogramn]):
 			)
 		return BiologicCPData(
 			
-			cmn.DataArray[ec.ChronoPotentiogramn](ca_list),
+			cmn.DataArray[ec.ChronoPotentiogram](ca_list),
 			_comment = ["file: "+cmn.extract_filename(file_path)],
 			_condition = condition,
 			_file_path = file_path,
@@ -259,7 +320,7 @@ def load_biologic_CV(
 	
 	return bl_voltammogram_data
 
-def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
+"""def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
 
 	with open(file_path, 'r', encoding='UTF-8') as file:
 		raw_txt_lines = file.readlines()
@@ -301,7 +362,7 @@ def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
 
 	return BiologicEISData(
 		_data = cmn.DataArray[EIS](eis_list),
-		_data_name = cmn.extract_filename(file_path),
+		_data_name = cmn.extractS_filename(file_path),
 		_comment = ["file: "+cmn.extract_filename(file_path)],
 		_condition = condition,
 		_file_path = file_path
@@ -323,7 +384,7 @@ def load_biologic_EIS(file_path: str)->Optional[BiologicEISData]:
 		_condition = condition,
 		_file_path = file_path
 	)
-	pass
+	pass"""
 
 """def load_biologic_mpt(file_path: str)->Union[Voltammogram, BiologicEIS]:
 	with open(file_path, 'r', encoding='UTF-8') as file:

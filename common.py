@@ -13,6 +13,8 @@ from typing import overload, Type, ClassVar, Generator
 from dataclasses import dataclass
 import abc
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 from copy import deepcopy as copy
 from functools import wraps
 import codecs
@@ -91,14 +93,17 @@ def self_mutator(func):
 #----------classes and relative variables--------------
 #------------------------------------------------------
 
-NOT_ALLOWED_ERROR_STR: Final[str] = "An invalid object was substituted.\nAllowd type is {}, but {} was used"
+NOT_ALLOWED_ERROR_STR: Final[str] = "An invalid object was substituted.\nAllowd type is {},\n but {} was used"
 OPERATION_ALLOWED_TYPES: Final[list[type]] = [
 	float,
 	int,
 	np.int32,
 	np.int64,
 	np.float32,
-	np.float64
+	np.float64,
+	complex,
+	np.complex64,
+	np.complex128,
 ]
 
 def typeerror_other_type(self, another):
@@ -148,23 +153,32 @@ class ValueObject:
 			値をこのクラスにキャストして返す。
 			floatなどの値型でなかった場合、TypeErrorを投げる。
 	"""
-	_value: np.float64
+	_value: np.float64|complex
 
-	def __init__(self, value: float):
-
+	def __init__(self, value: float|np.float64|complex):
 		if not(type(value) in OPERATION_ALLOWED_TYPES) and type(value) != type(self):
 			error_report = NOT_ALLOWED_ERROR_STR.format(OPERATION_ALLOWED_TYPES, str(type(value))).replace("<", "").replace(">", "")
 			raise TypeError(error_report)
 
-		self._value = np.float64(value)
+		if isinstance(value, ValueObject):
+			self._value = value.value
+		else:
+			self._value = value
 
 	@classmethod
 	def _cast_to_this(cls, value: Union[int, float, np.float64, np.int64])->Self:
 		return cls(value)
 		
 	@property
-	def value(self)->np.float64:
-		return np.float64(self._value)
+	def value(self)->np.float64|complex:
+		return self._value
+	
+	def __neg__(self):
+		"""
+		負の値を返す。
+		"""
+		cls_type = type(self)
+		return cls_type(-self.value)
 	
 	@immutator
 	def __add__(self, added_value):
@@ -205,7 +219,10 @@ class ValueObject:
 		
 		# normal process
 		cls_type=type(self)
-		product: cls_type = cls_type(self.value*float(muled_value))
+		if isinstance(muled_value, (complex, np.complex64, np.complex128)):
+			product = cls_type(self.value*muled_value)
+		else:
+			product: cls_type = cls_type(self.value*float(muled_value))
 		return product
 	
 	@immutator
@@ -311,7 +328,7 @@ class ValueObject:
 		return np.abs(self._value)
 
 
-ValObj = TypeVar('ValObj')
+ValObj = TypeVar('ValObj', bound=ValueObject)
 class ValueObjectArray(np.ndarray, Generic[ValObj]):
 	"""
 	値オブジェクト用のnp.ndarray。
@@ -478,9 +495,39 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
 	def __getitem__(self, array: tuple[np.ndarray, ...])->Union[Self, ValObj]:
 		#print("array")
 		return np.ndarray.__getitem__(self, array)
+	
+	def __sub__(self, subed_value: Union[Self, ValObj])->Self:
+		"""
+		引き算のオーバーロード
+		引き算はValueObjectArray同士でしか行えない。
+		"""
+		"""if type(subed_value) is not Self and type(subed_value) is not ValObj:
+			raise TypeError(
+				"ValueObjectArray can only be subtracted with the same type.\n\
+				This is {} but {}".format(type(self), type(subed_value))
+			)"""
+		
+		if isinstance(subed_value, ValueObjectArray):
+			return type(self)(self.float_array() - subed_value.float_array()) # type: ignore
 
+		if isinstance(subed_value, ValueObject):
+			return type(self)(self.float_array() - subed_value.value) # type: ignore
 
+		raise TypeError(
+			"ValueObjectArray can only be subtracted with the same type.\n\
+			This is {} but {}".format(type(self), type(subed_value))
+		)
 
+	"""@overload
+	def __iter__(self)->Self:
+		pass
+		return np.ndarray.__iter__(self)
+	
+	@overload
+	def __next__(self)->ValObj:
+		pass
+		return np.ndarray.__next__(self)
+"""
 
 T = TypeVar('T')
 class DataArray(np.ndarray, Generic[T]):
@@ -541,11 +588,20 @@ class DataArray(np.ndarray, Generic[T]):
 
 		return out
 	
-	def __getitem__(self, position)->T:
-		return np.ndarray.__getitem__(self, position)
+	
 
-	def __getitem__(self, slice)->T:
-		return np.ndarray.__getitem__(self, slice)
+	@overload
+	def __getitem__(self, suffix: SupportsIndex)->T:
+		...
+		#return np.ndarray.__getitem__(self, position)
+
+	@overload
+	def __getitem__(self, suffix: slice)->T:
+		...
+		#return np.ndarray.__getitem__(self, slice)
+	
+	def __getitem__(self, suffix: Union[SupportsIndex, slice])->T: # type: ignore
+		return np.ndarray.__getitem__(self, suffix) # type: ignore
 	
 	def __iter__(self)->Generator[T, None, None]:
 		return np.ndarray.__iter__(self)
@@ -806,10 +862,10 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
 	
 	def plot(
 		self, 
-		fig: Optional[plt.Figure]=None, 
-		ax: Optional[plt.Axes]=None, 
+		fig: Optional[Figure]=None,
+		ax: Optional[Axes]=None,
 		**kargs
-		)->tuple[plt.Figure, plt.Axes]:
+		)->tuple[Figure, Axes]:
 		"""
 		データの簡易プロット用クラスメソッド
 		figとaxは書き換える。
@@ -822,7 +878,7 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
 		
 		match ax:
 			case None:
-				_ax = _fig.add_axes([0.2,0.2,0.7,0.7])
+				_ax = _fig.add_axes((0.2,0.2,0.7,0.7))
 			
 			case _:
 				_ax = ax
@@ -914,7 +970,7 @@ def set_matpltlib_rcParameters()->None:
 	plt.rcParams['lines.markersize'] =6
 	return
 
-def create_standard_matplt_canvas()->tuple[plt.Figure, plt.Axes]:
+def create_standard_matplt_canvas()->tuple[Figure, Axes]:
     """
     ## Returns
     Returns tuple of usual Figure and Axes instances.
@@ -922,7 +978,7 @@ def create_standard_matplt_canvas()->tuple[plt.Figure, plt.Axes]:
 	ax = fig.add_axes([0.2,0.2,0.7,0.7])
 	"""
     fig=plt.figure(figsize = (4,3))
-    ax = fig.add_axes([0.2,0.2,0.7,0.7])
+    ax = fig.add_axes(rect=(0.2,0.2,0.7,0.7))
     return (fig, ax)
 
 def extract_extension(file_path: str)->Optional[str]:
@@ -1008,7 +1064,7 @@ def find_line_with_key(
 	# succesfully finished
 	return i_line_count+1
 
-def convert_relative_pos_to_pos_in_axes_label(pos: Point, ax: plt.Axes)->Point:
+def convert_relative_pos_to_pos_in_axes_label(pos: Point, ax: plt.Axes)->Point: # type: ignore
 	
 	rel_x, rel_y = pos.x, pos.y
 	
