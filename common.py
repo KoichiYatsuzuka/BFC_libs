@@ -306,7 +306,16 @@ class ValueObject:
         
         return self.value==another.value
     
+    @overload
+    def __pow__(self, power: int|float) -> float:
+        ...
+    @overload
+    def __pow__(self, power: complex) -> complex:
+        ...
 
+    @immutator
+    def __pow__(self, power: Union[int, float, complex])->float|complex:
+        return self.value**power
 
     @immutator
     def __str__(self):
@@ -366,7 +375,9 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
     #data_type: ClassVar[Type[ValObj]]
 
     def __new__(cls, obj, dtype, meta: Optional[str] = None):
-        self = np.asarray(list(map(dtype, obj)), dtype=np.object_).view(cls)
+        #self = np.asarray(list(map(dtype, obj)), dtype=np.object_).view(cls)
+        self = np.asarray(list(np.vectorize(dtype)(obj)), dtype=np.object_).view(cls)
+        
         self.data_type = dtype
         match meta:
             case None:
