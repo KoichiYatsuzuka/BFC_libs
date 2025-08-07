@@ -7,11 +7,12 @@ import pandas as pd
 from numpy import ufunc
 from numpy._typing import NDArray
 from typing import Any, Literal, Optional, SupportsIndex
-from typing import Union, NewType, Self
+from typing import Union, NewType, Self, Iterator
 from typing import Generic, TypeVar, TypeAlias, Final, cast
 from typing import overload, Type, ClassVar, Generator
 from dataclasses import dataclass
 import abc
+import collections
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -104,6 +105,7 @@ OPERATION_ALLOWED_TYPES: Final[list[type]] = [
     complex,
     np.complex64,
     np.complex128,
+    np.ndarray
 ]
 
 def typeerror_other_type(self, another):
@@ -221,6 +223,8 @@ class ValueObject:
         cls_type=type(self)
         if isinstance(muled_value, (complex, np.complex64, np.complex128)):
             product = cls_type(self.value*muled_value)
+        elif isinstance(muled_value, np.ndarray):
+            product = muled_value*self.value
         else:
             product: cls_type = cls_type(self.value*float(muled_value))
         return product
@@ -562,14 +566,14 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
         )
 
 
-    def __iter__(self)->Self:
+    def __iter__(self)->Iterator[Self|ValObj]:
         
         return np.ndarray.__iter__(self)
     
 
-    def __next__(self)->ValObj:
+"""    def __next__(self)->ValObj:
         
-        return np.ndarray.__next__(self)
+        return np.ndarray.__next__(self)"""
 
 
 T = TypeVar('T')
