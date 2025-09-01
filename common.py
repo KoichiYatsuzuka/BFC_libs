@@ -9,7 +9,8 @@ from numpy._typing import NDArray
 from typing import Any, Literal, Optional, SupportsIndex
 from typing import Union, NewType, Self, Iterator
 from typing import Generic, TypeVar, TypeAlias, Final, cast
-from typing import overload, Type, ClassVar, Generator
+from typing import overload, Type, ClassVar, Generator, TypeGuard
+from typing import override
 from dataclasses import dataclass
 import abc
 import collections
@@ -115,75 +116,37 @@ def typeerror_other_type(self, another):
                 replace("<", "").replace(">", "")
             raise TypeError(error_report)
 
-class ValueObject:
-    """
-    値オブジェクト用のクラス。
-    このライブラリは基本的にこのクラスを継承したクラスを値として扱う。
-    不正な演算（すなわち、意図しない演算）を防ぐため、このクラスの演算を許可する型を限定しており、float型への自動キャストを行わない。
-    明示的なfloatへのキャストは行える。
-
-    メンバ
-        _value
-            protected属性。値をnp.float64型で保持。
-        
-        value
-            property。値をnp.float64型で返す。
-        
-        __add__, __sub__
-            右辺で足す、引く。同じ型でないとTypeErrorを投げる。
-
-        __mul__, __truedev__
-            右辺でかける、割る。
-            同じ型か一般的な数値型（intやnp.float64など）でなければTypeErrorを投げる。
-            同じValueObject型でも、異なるサブクラス同士の演算は基本許可しない。
-            サブクラスに別にメンバメソッドを用意する
-
-        比較演算子系特殊メソッド
-            同じ型でなければTypeErrorを投げる。
-
-        __str__, __repr__
-            self._value.__str__()を返す。
-
-        __abs__
-            self._value.__abs__()を返す。
-
-        __float__
-            _valueをfloatにキャストして返す。			
-
-    クラスメソッド
-        _cast_to_this()
-            値をこのクラスにキャストして返す。
-            floatなどの値型でなかった場合、TypeErrorを投げる。
-    """
-    _value: np.float64|complex
-
-    def __init__(self, value: float|np.float64|complex):
-        if not(type(value) in OPERATION_ALLOWED_TYPES) and type(value) != type(self):
-            error_report = NOT_ALLOWED_ERROR_STR.format(OPERATION_ALLOWED_TYPES, str(type(value))).replace("<", "").replace(">", "")
-            raise TypeError(error_report)
-
-        if isinstance(value, ValueObject):
-            self._value = value.value
-        else:
-            self._value = value
+ValType = TypeVar('ValType', bound=float|complex)
+class ValueObjectBase(Generic[ValType]):
+    _value: ValType
 
     @classmethod
-    def _cast_to_this(cls, value: Union[int, float, np.float64, np.int64])->Self:
+    def _cast_to_this(cls, value: Union[int, float, np.float64, np.int64, complex])->Self:
         return cls(value)
-        
-    @property
-    def value(self)->np.float64|complex:
-        return self._value
     
-    def __neg__(self):
+    @property
+    def value(self)->ValType:
+        ...
+    
+    def __neg__(self)->Self:
         """
         負の値を返す。
         """
         cls_type = type(self)
         return cls_type(-self.value)
     
+    @property
+    def real(self):
+        clstype = type(self)
+        return clstype(self.value.real)
+    
+    @property
+    def imag(self):
+        clstype = type(self)
+        return clstype(self.value.imag)
+    
     @immutator
-    def __add__(self, added_value):
+    def __add__(self, added_value:Self):
         # error
         if type(self)!=type(added_value):
             error_report = \
@@ -197,7 +160,7 @@ class ValueObject:
         return sum
     
     @immutator
-    def __sub__(self, subed_value):
+    def __sub__(self, subed_value:Self):
         # error
         if type(self)!=type(subed_value):
             error_report = \
@@ -261,7 +224,7 @@ class ValueObject:
         return quotient
     
     @immutator
-    def __lt__(self, another):
+    def __lt__(self, another)->bool:
         # error
         try:
             typeerror_other_type(self, another)
@@ -271,7 +234,7 @@ class ValueObject:
         return self.value<another.value
 
     @immutator
-    def __le__(self, another):
+    def __le__(self, another:Self)->bool:
         # error
         try:
             typeerror_other_type(self, another)
@@ -281,7 +244,7 @@ class ValueObject:
         return self.value<=another.value
     
     @immutator
-    def __gt__(self, another: Self):
+    def __gt__(self, another: Self)->bool:
         # error
         try:
             typeerror_other_type(self, another)
@@ -309,39 +272,299 @@ class ValueObject:
             raise ValueError(error_report)
         
         return self.value==another.value
-    
-    @overload
-    def __pow__(self, power: int|float) -> float:
-        ...
-    @overload
-    def __pow__(self, power: complex) -> complex:
-        ...
 
-    @immutator
-    def __pow__(self, power: Union[int, float, complex])->float|complex:
-        return self.value**power
 
     @immutator
     def __str__(self):
-        
         return str(self.value)
     
     @immutator
     def __repr__(self)->str:
-        
         return str(self.value)
     
     @immutator
-    def __float__(self)->float:
+    def __complex__(self)->complex:
+        return complex(self.value)
+    
+    def sqrt(self)->ValType:
+        return np.sqrt(self._value)
+    
+    def exp(self)->ValType:
+        return np.exp(self._value)
+    
+    def sin(self)->ValType:
+        return np.sin(self._value)
+    
+
+
+
+class ValueObject(ValueObjectBase[float]):
+    """
+    値オブジェクト用のクラス。
+    このライブラリは基本的にこのクラスを継承したクラスを値として扱う。
+    不正な演算（すなわち、意図しない演算）を防ぐため、このクラスの演算を許可する型を限定しており、float型への自動キャストを行わない。
+    明示的なfloatへのキャストは行える。
+
+    メンバ
+        _value
+            protected属性。値をnp.float64型で保持。
         
+        value
+            property。値をnp.float64型で返す。
+        
+        __add__, __sub__
+            右辺で足す、引く。同じ型でないとTypeErrorを投げる。
+
+        __mul__, __truedev__
+            右辺でかける、割る。
+            同じ型か一般的な数値型（intやnp.float64など）でなければTypeErrorを投げる。
+            同じValueObject型でも、異なるサブクラス同士の演算は基本許可しない。
+            サブクラスに別にメンバメソッドを用意する
+
+        比較演算子系特殊メソッド
+            同じ型でなければTypeErrorを投げる。
+
+        __str__, __repr__
+            self._value.__str__()を返す。
+
+        __abs__
+            self._value.__abs__()を返す。
+
+        __float__
+            _valueをfloatにキャストして返す。			
+
+    クラスメソッド
+        _cast_to_this()
+            値をこのクラスにキャストして返す。
+            floatなどの値型でなかった場合、TypeErrorを投げる。
+    """
+    #_value: np.float64|complex
+
+    def __init__(self, value: float|np.float64|complex):
+        if not(type(value) in OPERATION_ALLOWED_TYPES) and type(value) != type(self):
+            error_report = NOT_ALLOWED_ERROR_STR.format(OPERATION_ALLOWED_TYPES, str(type(value))).replace("<", "").replace(">", "")
+            raise TypeError(error_report)
+
+        if isinstance(value, type(self)):
+            self._value = value.value
+        else:
+            self._value = value
+
+    # @classmethod
+    # def _cast_to_this(cls, value: Union[int, float, np.float64, np.int64])->Self:
+    #     return cls(value)
+        
+    @property
+    def value(self)->float:
+        return self._value
+    
+    # def __neg__(self):
+    #     """
+    #     負の値を返す。
+    #     """
+    #     cls_type = type(self)
+    #     return cls_type(-self.value)
+    
+    # @property
+    # def real(self):
+    #     clstype = type(self)
+    #     return clstype(self.value.real)
+    
+    # @property
+    # def imag(self):
+    #     clstype = type(self)
+    #     return clstype(self.value.imag)
+    
+    # @immutator
+    # def __add__(self, added_value):
+    #     # error
+    #     if type(self)!=type(added_value):
+    #         error_report = \
+    #             NOT_ALLOWED_ERROR_STR.format(str(type(self)), str(type(added_value))).\
+    #             replace("<", "").replace(">", "")
+    #         raise TypeError(error_report)
+        
+    #     # normal process
+    #     cls_type=type(self)
+    #     sum: cls_type = cls_type(self.value+added_value.value)
+    #     return sum
+    
+    # @immutator
+    # def __sub__(self, subed_value):
+    #     # error
+    #     if type(self)!=type(subed_value):
+    #         error_report = \
+    #             NOT_ALLOWED_ERROR_STR.format(str(type(self)), str(type(subed_value))).\
+    #             replace("<", "").replace(">", "")
+    #         raise TypeError(error_report)
+        
+    #     # normal process
+    #     cls_type=type(self)
+    #     diff: cls_type = cls_type(self.value-subed_value.value)
+    #     return diff
+    
+    # @immutator
+    # def __mul__(self, muled_value: Union[int, float, Self]):
+    #     # error
+    #     if not(type(muled_value) in OPERATION_ALLOWED_TYPES) and type(muled_value)!= type(self):
+    #         error_report = \
+    #             NOT_ALLOWED_ERROR_STR.format(str(OPERATION_ALLOWED_TYPES), str(type(muled_value))).\
+    #             replace("<", "").replace(">", "")
+    #         raise TypeError(error_report)
+        
+    #     # normal process
+    #     cls_type=type(self)
+    #     if isinstance(muled_value, (complex, np.complex64, np.complex128)):
+    #         product = cls_type(self.value*muled_value)
+    #     elif isinstance(muled_value, np.ndarray):
+    #         product = muled_value*self.value
+    #     else:
+    #         product: cls_type = cls_type(self.value*float(muled_value))
+    #     return product
+    
+    # @immutator
+    # def __rmul__(self, muld_value: Union[int, float, Self]):
+    #     return self.__mul__(muld_value)
+    
+    # @immutator
+    # def __truediv__(self, dived_value: Union[int, float, Self]):
+    #     # error
+    #     if not(type(dived_value) in OPERATION_ALLOWED_TYPES) and type(dived_value)!= type(self):
+    #         error_report = \
+    #             NOT_ALLOWED_ERROR_STR.format(str(str(OPERATION_ALLOWED_TYPES)), str(type(dived_value))).\
+    #             replace("<", "").replace(">", "")
+    #         raise TypeError(error_report)
+        
+    #     cls_type=type(self)
+    #     quotient: cls_type = cls_type(self.value / np.float64(dived_value))
+    #     return quotient
+    
+    # @immutator
+    # def __rtruediv__(self, dived_value: Union[int, float, Self]):
+    #     # error
+    #     if type(dived_value)!=int and type(dived_value)!= float and type(dived_value)!= type(self):
+    #         error_report = \
+    #             NOT_ALLOWED_ERROR_STR.format(str(Union[float, int, type(self)]), str(type(dived_value))).\
+    #             replace("<", "").replace(">", "")
+    #         raise TypeError(error_report)
+        
+    #     cls_type=type(self)
+    #     quotient: cls_type = cls_type(np.float64(dived_value)/self.value)
+        
+    #     return quotient
+    
+    # @immutator
+    # def __lt__(self, another):
+    #     # error
+    #     try:
+    #         typeerror_other_type(self, another)
+    #     except ValueError as error_report:
+    #         raise ValueError(error_report)
+        
+    #     return self.value<another.value
+
+    # @immutator
+    # def __le__(self, another):
+    #     # error
+    #     try:
+    #         typeerror_other_type(self, another)
+    #     except ValueError as error_report:
+    #         raise ValueError(error_report)
+        
+    #     return self.value<=another.value
+    
+    # @immutator
+    # def __gt__(self, another: Self):
+    #     # error
+    #     try:
+    #         typeerror_other_type(self, another)
+    #     except ValueError as error_report:
+    #         raise ValueError(error_report)
+        
+    #     return self.value>another.value
+    
+    # @immutator
+    # def __ge__(self, another: Self):
+    #     # error
+    #     try:
+    #         typeerror_other_type(self, another)
+    #     except ValueError as error_report:
+    #         raise ValueError(error_report)
+        
+    #     return self.value>=another.value
+    
+    # @immutator
+    # def __eq__(self, another: Self):
+    #     # error
+    #     try:
+    #         typeerror_other_type(self, another)
+    #     except ValueError as error_report:
+    #         raise ValueError(error_report)
+        
+    #     return self.value==another.value
+    
+    # @overload
+    # def __pow__(self, power: int|float) -> float:
+    #     ...
+    # @overload
+    # def __pow__(self, power: complex) -> complex:
+    #     ...
+
+    # @immutator
+    # def __pow__(self, power: Union[int, float, complex])->float|complex:
+    #     return self.value**power
+
+    # @immutator
+    # def __str__(self):
+        
+    #     return str(self.value)
+    
+    # @immutator
+    # def __repr__(self)->str:
+        
+    #     return str(self.value)
+    
+    #@immutator
+    def __float__(self)->float:
         return float(self.value)
     
-    @immutator
-    def __abs__(self):
-        return np.abs(self._value)
+    # @immutator
+    # def __complex__(self)->complex:
+    #     return complex(self.value)
+    
+    # @immutator
+    # def __abs__(self):
+    #     return np.abs(self._value)
 
+RealNumberType = TypeVar('RealNumberType', bound=ValueObjectBase)
+class ValueObjectComplex(ValueObjectBase[complex], Generic[RealNumberType]):
+    """
+    仮想クラス
+    """
 
-ValObj = TypeVar('ValObj', bound=ValueObject)
+    def __init__(self, value: float|np.float64|complex):
+        if not(type(value) in OPERATION_ALLOWED_TYPES) and type(value) != type(self):
+            error_report = NOT_ALLOWED_ERROR_STR.format(OPERATION_ALLOWED_TYPES, str(type(value))).replace("<", "").replace(">", "")
+            raise TypeError(error_report)
+
+        if isinstance(value, type(self)):
+            self._value = complex(value.value)
+        else:
+            self._value = complex(value)
+    
+    @property
+    def real(self)->RealNumberType:
+        ...
+
+    @property
+    def imag(self)->RealNumberType:
+        ...
+
+    @property
+    def value(self)->complex:
+        return self._value
+
+ValObj = TypeVar('ValObj', bound=ValueObjectBase, covariant=True)
 class ValueObjectArray(np.ndarray, Generic[ValObj]):
     """
     値オブジェクト用のnp.ndarray。
@@ -378,7 +601,9 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
     """
     #data_type: ClassVar[Type[ValObj]]
 
-    def __new__(cls, obj, dtype, meta: Optional[str] = None):
+    def __new__(cls, obj, dtype=None, meta: Optional[str] = None):
+        if dtype is None:
+            dtype = type(obj)
         #self = np.asarray(list(map(dtype, obj)), dtype=np.object_).view(cls)
         self = np.asarray(list(np.vectorize(dtype)(obj)), dtype=np.object_).view(cls)
         
@@ -409,7 +634,13 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
             arg = arg.view(np.ndarray) if isinstance(arg, ValueObjectArray) else arg
             args_.append(arg)
         # 関数を呼び出す
-        out_raw = getattr(ufunc, method)(*args_, **kwargs)
+        try:
+            out_raw = getattr(ufunc, method)(*args_, **kwargs)
+        except(TypeError) as e:
+            print("shape: {}".format(self.shape))
+            print("dtype: {}".format(type(self[0])))
+            raise e
+
         
         # なんか必要らしい
         if out_raw is NotImplemented:
@@ -452,6 +683,9 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
     #@immutator
     def float_array(self)->np.ndarray:
         return np.array(self, dtype=np.float64)
+    
+    def complex_array(self)->np.ndarray:
+        return np.array(self, dtype=complex)
 
     #@immutator
     def find(self, target_value, begin_index: int = 0, end_index: int = None)->Optional[list[int]]:
@@ -503,6 +737,17 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
         joined_ndarray = np.append(self_ndarray, another_ndarray)
         return type(self)(joined_ndarray)
     
+    @property
+    @override
+    def real(self):
+        self_type = type(self)
+        return self_type(self.complex_array().real)
+    
+    @property
+    @override
+    def imag(self):
+        self_type = type(self)
+        return self_type(self.complex_array().imag)
 
     def __and__(self, another: Self)->Self:
         return self.join(another)
@@ -569,11 +814,79 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
     def __iter__(self)->Iterator[Self|ValObj]:
         
         return np.ndarray.__iter__(self)
+
+
+
+def is_voarray(self: Union[ValObj,ValueObjectArray[ValObj]])->TypeGuard[ValueObjectArray[ValObj]]:
+    return isinstance(self, ValueObjectArray)
+
+def is_vo(self: Union[ValObj,ValueObjectArray[ValObj]])->TypeGuard[ValObj]:
+    return isinstance(self, ValueObject)
+
     
 
 """    def __next__(self)->ValObj:
         
         return np.ndarray.__next__(self)"""
+
+
+"""class VO_NDArray[T](np.ndarray):
+
+
+    #data_type: ClassVar[Type[ValObj]]
+
+    def __new__(cls, obj: list[T], dtype=None, meta: Optional[str] = None):
+        
+        if dtype is None:
+            dtype = type(obj)
+        
+        #self = np.asarray(list(map(dtype, obj)), dtype=np.object_).view(cls)
+        #self = np.asarray(list(np.vectorize(dtype)(obj)), dtype=np.object_).view(cls)
+        
+        self.data_type = dtype
+        match meta:
+            case None:
+                self.meta=""
+            
+            case _:
+                self.meta = meta
+        
+        return self
+    
+    def __array_finalize__(self, obj: Optional[NDArray[Any]]):
+        #おそらく動いていないが、必要になったら改変
+        if obj is None:
+            return None
+        self.meta = getattr(obj, "meta", None)
+
+    def __array_ufunc__(self, ufunc: ufunc, method, *args: Any, **kwargs: Any):
+        metalist = [] # メタ情報のリスト
+        args_ = [] # 入力引数のリスト
+        for arg in args:
+            # 可能ならメタ情報をリストに追加
+            if isinstance(arg, self.__class__) and hasattr(arg, "meta"):
+                metalist.append(arg.meta)
+            # MetaArrayはndarrayに直す
+            arg = arg.view(np.ndarray) if isinstance(arg, ValueObjectArray) else arg
+            args_.append(arg)
+        # 関数を呼び出す
+        out_raw = getattr(ufunc, method)(*args_, **kwargs)
+        
+        # なんか必要らしい
+        if out_raw is NotImplemented:
+            return NotImplemented
+
+        # 型を戻す。このとき、スカラー(np.float64など)は変化しない。
+        out = out_raw.view(self.__class__) if isinstance(out_raw, np.ndarray) else out_raw
+
+        # メタ情報を引き継ぐ。このとき、入力したメタ情報を連結する。
+        if isinstance(out, self.__class__):
+            #print(metalist)
+            #print(ufunc.__name__)
+            out.meta = ','.join(metalist)+"_"+ufunc.__name__
+
+        return out"""
+    
 
 
 T = TypeVar('T')

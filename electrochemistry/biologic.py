@@ -13,7 +13,7 @@ from nptyping import NDArray
 
 from .. import common as cmn
 from ..common import immutator
-from . import ReferenceElectrode, Registance, Voltammogram, Potential, Current, EIS
+from . import ReferenceElectrode, Resistance, Voltammogram, Potential, Current, EIS
 from .. import electrochemistry as ec
 
 BiologicFileInfo = namedtuple("BiologicFileInfo", ['skip_line_num', 'conditions'])
