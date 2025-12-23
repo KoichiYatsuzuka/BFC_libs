@@ -273,6 +273,9 @@ class ValueObjectBase(Generic[ValType]):
         
         return self.value==another.value
 
+    def __abs__(self)->float:
+            return abs(self._value)
+
 
     @immutator
     def __str__(self):
