@@ -104,8 +104,8 @@ class BiologicEISData(cmn.DataFile[ec.EIS]):
 
 		for i, cycle_range in enumerate (cycle_range_list):
 			tmp_eis = EIS(
-				_real_Z = ec.ImpedanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
-				_imaginary_Z = ec.ImpedanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_real_Z = ec.ResistanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_imaginary_Z = ec.ResistanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
 				_frequency = ec.FrequencyArray(np.array(df["freq/Hz"][cycle_range.begin:cycle_range.end]), meta=file_path),
 				_data_name = "",
 				_other_data = df.drop(columns=["Re(Z)/Ohm", "-Im(Z)/Ohm", "freq/Hz"])[cycle_range.begin:cycle_range.end].reset_index(),

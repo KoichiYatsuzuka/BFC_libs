@@ -502,6 +502,20 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
     def frequency(self):
         return self._frequency
     
+    @property
+    def abs_Z(self):
+        return ResistanceArray(np.sqrt(
+            self._real_Z.float_array()**2 +
+            self._imaginary_Z.float_array()**2
+        ))
+    
+    @property
+    def phase(self):
+        return np.arctan2(
+            self._imaginary_Z.float_array(),
+            self._real_Z.float_array()
+        )
+    
     """_phase: cmn.ValueObjectArray
     @property
     def phase(self):
