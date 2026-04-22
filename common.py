@@ -624,7 +624,7 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
         #おそらく動いていないが、必要になったら改変
         if obj is None:
             return None
-        self.meta = getattr(obj, "meta", None)
+        self.meta = getattr(obj, "meta", None) or ""
 
     def __array_ufunc__(self, ufunc: ufunc, method, *args: Any, **kwargs: Any):
         metalist = [] # メタ情報のリスト
@@ -659,6 +659,15 @@ class ValueObjectArray(np.ndarray, Generic[ValObj]):
             out.meta = ','.join(metalist)+"_"+ufunc.__name__
 
         return out
+
+    def __array__(self, dtype=None, copy=None) -> np.ndarray:
+        # self.view(np.ndarray) で基底クラスの object 配列を取得（再帰防止）
+        # matplotlib など数値ライブラリとの互換性のため float64 を返す
+        base = self.view(np.ndarray)
+        result = base.astype(np.float64)
+        if dtype is not None and dtype != np.float64:
+            result = result.astype(dtype)
+        return result
 
     #@immutator
     def normalize(self, begin_index=None, end_index=None)->Self:
@@ -860,7 +869,7 @@ def is_vo(self: Union[ValObj,ValueObjectArray[ValObj]])->TypeGuard[ValObj]:
         #おそらく動いていないが、必要になったら改変
         if obj is None:
             return None
-        self.meta = getattr(obj, "meta", None)
+        self.meta = getattr(obj, "meta", None) or ""
 
     def __array_ufunc__(self, ufunc: ufunc, method, *args: Any, **kwargs: Any):
         metalist = [] # メタ情報のリスト
@@ -921,7 +930,7 @@ class DataArray(np.ndarray, Generic[T]):
         #おそらく動いていないが、必要になったら改変
         if obj is None:
             return None
-        self.meta = getattr(obj, "meta", None)
+        self.meta = getattr(obj, "meta", None) or ""
 
     def __array_ufunc__(self, ufunc: ufunc, method, *args: Any, **kwargs: Any):
         metalist = [] # メタ情報のリスト
