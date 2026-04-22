@@ -727,7 +727,7 @@ class ChronoPotentiogram(cmn.DataSeriese[cmn.Time, Current]):
     
     @property
     def y(self):
-        return self._current
+        return self._potential
     
     def to_data_frame(self) -> pd.DataFrame:
         return pd.DataFrame(
