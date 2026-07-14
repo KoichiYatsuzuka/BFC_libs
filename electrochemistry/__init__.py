@@ -497,7 +497,7 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
     def imaginary_Z(self):
         return self._imaginary_Z
     
-    _frequency: cmn.ValueObjectArray
+    _frequency: FrequencyArray
     @property
     def frequency(self):
         return self._frequency
@@ -514,6 +514,12 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
         return np.arctan2(
             self._imaginary_Z.float_array(),
             self._real_Z.float_array()
+        )
+    
+    @property
+    def impedance(self):
+        return ImpedanceArray(
+            self.real_Z.float_array() + 1j*self.imaginary_Z.float_array()
         )
     
     """_phase: cmn.ValueObjectArray
@@ -540,18 +546,30 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
         return self._imaginary_Z
 
     def to_data_frame(self) -> pd.DataFrame:
-        return pd.DataFrame(
-                np.stack([
-                    self._frequency.float_array(),
-                    self._real_Z.float_array(),
-                    self._imaginary_Z.float_array()
-                ], 1),
-                columns = [
-                    "frequency",
-                    "real Z",
-                    "imaginary Z"
-                ]
-            ).join(self._other_data)
+        n_data = len(self._frequency.float_array())
+        n_total = max(n_data, len(self._comment), len(self._condition))
+
+        def pad_str(lst: list[str]) -> list:
+            return lst + [pd.NA] * (n_total - len(lst))
+
+        def pad_float(arr) -> np.ndarray:
+            tail = np.full(n_total - len(arr), np.nan)
+            return np.concatenate([arr, tail])
+
+        base = pd.DataFrame(
+            np.stack([
+                pad_float(self._frequency.float_array()),
+                pad_float(self._real_Z.float_array()),
+                pad_float(self._imaginary_Z.float_array()),
+            ], 1),
+            columns=["frequency", "real Z", "imaginary Z"],
+        )
+        if not self._other_data.empty:
+            other = self._other_data.reindex(range(n_total))
+            base = base.join(other)
+        base["comment"]   = pd.array(pad_str(self._comment),   dtype="string")
+        base["condition"] = pd.array(pad_str(self._condition), dtype="string")
+        return base
     
     @classmethod
     def from_data_frame(
@@ -561,14 +579,14 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
         condition: list[str] = [], 
         original_file_path: str = ""
         ) -> Self:
-        return EIS(
-            _comment = comment,
-            _condition = condition,
+        return cls(
+            _comment = df["comment"].dropna().tolist()+comment,
+            _condition = df["condition"].dropna().tolist()+condition,
             _original_file_path = original_file_path,
             _data_name = f"Generated from dataframe({cmn.extract_filename(original_file_path)})",
-            _real_Z = ResistanceArray(df["real Z"]),
-            _imaginary_Z = ResistanceArray(df["imaginary Z"]),
-            _frequency = df["frequency"],
+            _real_Z = ResistanceArray(df["real Z"].dropna()),
+            _imaginary_Z = ResistanceArray(df["imaginary Z"].dropna()),
+            _frequency = FrequencyArray(df["frequency"].dropna().to_numpy()),
             _other_data = pd.DataFrame(
                 df.drop(columns="frequency")\
                 .drop(columns= "real Z")\

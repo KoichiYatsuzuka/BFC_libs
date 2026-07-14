@@ -901,12 +901,222 @@ def is_vo(self: Union[ValObj,ValueObjectArray[ValObj]])->TypeGuard[ValObj]:
     
 
 
-T = TypeVar('T')
-class DataArray(np.ndarray, Generic[T]):
-    """
-    """
+X = TypeVar('X', ValueObjectArray, np.ndarray)
+Y = TypeVar('Y', ValueObjectArray, np.ndarray)
 
+@dataclass(frozen=True, repr=False)
+class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
     """
+    An abstracted class for DataSereise, for example, voltammogram, spectrum, and so on.
+    Instances of DataFile class have instance(s) of this type.
+    Some methods must be overrided to fully use the member methods.
+    When inheriting, type of x series and y series (i.g. Voltammogram = DataSeries[Potential, Current]).
+    These are used for type hints of some methods.
+
+    データ系列を表すための抽象クラス（例: ボルタモグラム、スペクトル、など）
+    DataFileクラスのインスタンスはこのクラスのインスタンスを内包する。
+    いくつかのメンバメソッドをオーバーライドしなければ使えないメソッドがある。
+    継承時にx, y系列の型を指定する（例: Voltammogram = DataSeries[Potential, Current]）。
+    これらはいくつかのメソッドの型ヒントに使われる。
+    継承時に@dataclass(frozen=True, repr=False)を使う。
+
+    ## virtual methods
+    x(), y(), to_data_frame(), from_data_frame()\n
+    They throw AttributeError when called without override.
+
+    ## members
+    x,y: ValueObjectArray (property getter)
+        Have to be overrided.
+        Refferes data corresponding to x and y in usual figures.
+
+        i.g.
+        Voltammograms
+            x: potential y: current
+        XRD
+            x: 2theta y: diffraction intensity
+
+    comment: list[str] (property getter)
+        This includes history of instance modifications. All methods to generate modified instances must log the modifications.
+        Users can track the log of modification of the instance.
+
+    condition: list[str] (property getter)
+        Automatically substracted from meta data zone, if possible.
+
+    original_file_path: list[str] (property getter)
+        As the name means
+
+    plot()
+        Can be overrided to add axes labels.
+        Method to roughly plot the data.
+        The axes are reusable.
+
+    slice()
+        Slicing data using the lower and upper values of x series, not with index.
+
+    to_data_frame()
+        Have to be overrided
+        Method to convert the content to pd.DataFrame.
+        Some imformation (i.g. original file name) is missed.
+
+    ## class method
+    from_data_frame()
+        Have to be overrided.
+        Method to generate an instance from pd.DataFrame.
+    """
+    _comment: list[str]
+    _condition: list[str]
+    _original_file_path: str
+    _data_name : str
+
+
+    @property
+    def x(self)->ValueObjectArray:
+        raise AttributeError("x getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class.")
+        pass
+
+    @property
+    def y(self)->ValueObjectArray:
+        raise AttributeError("y getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class")
+        pass
+
+    @property
+    def data_name(self):
+        return self._data_name
+
+    @property
+    def condition(self):
+        return self._condition
+
+    @property
+    def comment(self):
+        return self._comment
+
+    @property
+    def original_file_path(self):
+        return self._original_file_path
+
+    def to_data_frame(self)->pd.DataFrame:
+        raise AttributeError("This method must be overrided")
+
+    @classmethod
+    def from_data_frame(
+        cls,
+        df: pd.DataFrame,
+        comment: list[str] = [],
+        condition: list[str] = [],
+        original_file_path: str = "",
+        )->Self:
+        raise AttributeError("This method must be overrided")
+
+    def to_csv(self, file_path: str):
+        self.to_data_frame().to_csv(path_or_buf=file_path, encoding="UTF-8", index=False)
+        return
+
+    @immutator
+    def slice(self, x_min: Optional[X] = None, x_max: Optional[X] = None)->Self:
+        if x_min is None:
+            x_min = self.x[0]
+
+        if x_max is None:
+            x_max = self.x[-1]
+
+        try:
+            if x_min < self.x.min() or x_max > self.x.max():
+                raise ValueError(
+                    f"x_min and x_max must be more and less than the mimimum and mazimum of x, respectively.\n\
+                    x_min: {x_min}, minimum x: {self.x.min()}, x_max: {x_max}, maximum x: {self.x.max()}"
+                    )
+        except TypeError:
+            raise TypeError(
+                f"TypeError was raised during a comparison.\n\
+                x_min: {type(x_min)}, x_max: {type(x_max)}, \n\
+                type of x element: {type(self.x[0])} "
+            )
+
+        x_min_index = self.x.find(x_min)[0]
+        x_max_index = self.x.find(x_max)[-1]
+        tmp_df = self.to_data_frame()
+
+        sliced = self.from_data_frame(
+            df = tmp_df.iloc[x_min_index:x_max_index],
+            comment = self.comment + [f"sliced: x_min = {x_min}, x_max = {x_max}"],
+            condition = self.condition,
+            original_file_path = self.original_file_path
+            )
+
+        return sliced
+
+        pass
+
+    def __repr__(self):
+        return self.data_name+": "+str(type(self))+"\n"+self.to_data_frame().__repr__()
+
+    def plot(
+        self,
+        fig: Optional[Figure]=None,
+        ax: Optional[Axes]=None,
+        **kargs
+        )->tuple[Figure, Axes]:
+        """
+        データの簡易プロット用クラスメソッド
+        figとaxは書き換える。
+        """
+        match fig:
+            case None:
+                _fig = plt.figure(figsize = (4,3))
+            case _:
+                _fig = fig
+
+        match ax:
+            case None:
+                _ax = _fig.add_axes((0.2,0.2,0.7,0.7))
+
+            case _:
+                _ax = ax
+
+        _ax.plot(self.x,self.y, **kargs)
+        return (_fig, _ax)
+
+
+T = TypeVar('T', bound=DataSeriese)
+class DataArray(np.ndarray, Generic[T]):
+    """Array for chemical data, such as spectra or voltammograms.
+    The items are instances of a DataSeries subclass.
+    
+
+    スペクトルやボルタモグラムと言った、測定データや計算結果の配列。
+    要素はDataSeriesのサブクラスのインスタンス。
+
+    How to declare & use
+    ----------
+    This is a template class. Because of the fucking specification of Python, the data type must be specified twice.
+    ```
+    # In the case of cyclic voltammograms.
+    
+    CV_list: list[ec.CyclicVoltammetry] = CV_list_generation_function(data_file_path)
+    data_list = DataArray[ec.CyclicVoltammetry](CV_list, ec.CyclicVoltammetry) # Initialization with a list of DataSeries subclass
+    ```
+    Parameters
+    ----------
+    obj : array-like
+        Input data to be converted to the array.
+    dtype : np.dtype
+        Desired data type of the array. This must be identical to T.
+    meta : str, optional
+        Metadata label attached to the array.
+
+    Attributes
+    ----------
+    meta : str
+        Metadata string describing the array's origin or content.
+
+    Type Parameters
+    ---------------
+    T
+        Element type returned by indexing (``__getitem__``, ``__iter__``).
+
+    Notes
+    -----
     ValueObjectArrayを参考にしながら作成
     """
     #array : np.ndarray
@@ -1081,182 +1291,6 @@ class DataFile(Generic[T], metaclass=abc.ABCMeta):
         members["_comment"] = tmp
 
         return type(self)(**members)
-
-X = TypeVar('X', ValueObjectArray, np.ndarray)
-Y = TypeVar('Y', ValueObjectArray, np.ndarray)
-
-@dataclass(frozen=True, repr=False)
-class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
-    """
-    An abstracted class for DataSereise, for example, voltammogram, spectrum, and so on.
-    Instances of DataFile class have instance(s) of this type.
-    Some methods must be overrided to fully use the member methods.
-    When inheriting, type of x series and y series (i.g. Voltammogram = DataSeries[Potential, Current]).
-    These are used for type hints of some methods.
-
-    データ系列を表すための抽象クラス（例: ボルタモグラム、スペクトル、など）
-    DataFileクラスのインスタンスはこのクラスのインスタンスを内包する。
-    いくつかのメンバメソッドをオーバーライドしなければ使えないメソッドがある。
-    継承時にx, y系列の型を指定する（例: Voltammogram = DataSeries[Potential, Current]）。
-    これらはいくつかのメソッドの型ヒントに使われる。
-    継承時に@dataclass(frozen=True, repr=False)を使う。
-
-    ## virtual methods
-    x(), y(), to_data_frame(), from_data_frame()\n
-    They throw AttributeError when called without override.
-
-    ## members
-    x,y: ValueObjectArray (property getter)
-        Have to be overrided. 
-        Refferes data corresponding to x and y in usual figures.
-        
-        i.g.
-        Voltammograms
-            x: potential y: current
-        XRD
-            x: 2theta y: diffraction intensity
-
-    comment: list[str] (property getter)
-        This includes history of instance modifications. All methods to generate modified instances must log the modifications.
-        Users can track the log of modification of the instance.
-
-    condition: list[str] (property getter)
-        Automatically substracted from meta data zone, if possible.
-
-    original_file_path: list[str] (property getter)
-        As the name means
-
-    plot()
-        Can be overrided to add axes labels.
-        Method to roughly plot the data.
-        The axes are reusable.
-
-    slice()
-        Slicing data using the lower and upper values of x series, not with index.
-        
-    to_data_frame()
-        Have to be overrided
-        Method to convert the content to pd.DataFrame.
-        Some imformation (i.g. original file name) is missed.
-    
-    ## class method
-    from_data_frame()
-        Have to be overrided.
-        Method to generate an instance from pd.DataFrame.
-    """
-    _comment: list[str]
-    _condition: list[str]
-    _original_file_path: str
-    _data_name : str
-
-    
-    @property
-    def x(self)->ValueObjectArray:
-        raise AttributeError("x getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class.")
-        pass
-
-    @property
-    def y(self)->ValueObjectArray:
-        raise AttributeError("y getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class")
-        pass
-
-    @property
-    def data_name(self):
-        return self._data_name
-
-    @property
-    def condition(self):
-        return self._condition
-
-    @property
-    def comment(self):
-        return self._comment
-        
-    @property
-    def original_file_path(self):
-        return self._original_file_path
-    
-    def to_data_frame(self)->pd.DataFrame:
-        raise AttributeError("This method must be overrided")
-
-    @classmethod
-    def from_data_frame(
-        cls, 
-        df: pd.DataFrame, 
-        comment: list[str] = [],
-        condition: list[str] = [],
-        original_file_path: str = "",
-        )->Self:
-        raise AttributeError("This method must be overrided")
-    
-    def to_csv(self, file_path: str):
-        self.to_data_frame().to_csv(path_or_buf=file_path, encoding="UTF-8", index=False)
-        return
-
-    @immutator
-    def slice(self, x_min: Optional[X] = None, x_max: Optional[X] = None)->Self:
-        if x_min is None:
-            x_min = self.x[0]
-
-        if x_max is None:
-            x_max = self.x[-1]
-        
-        try:
-            if x_min < self.x.min() or x_max > self.x.max():
-                raise ValueError(
-                    f"x_min and x_max must be more and less than the mimimum and mazimum of x, respectively.\n\
-                    x_min: {x_min}, minimum x: {self.x.min()}, x_max: {x_max}, maximum x: {self.x.max()}"
-                    )
-        except TypeError:
-            raise TypeError(
-                f"TypeError was raised during a comparison.\n\
-                x_min: {type(x_min)}, x_max: {type(x_max)}, \n\
-                type of x element: {type(self.x[0])} "
-            )
-        
-        x_min_index = self.x.find(x_min)[0]
-        x_max_index = self.x.find(x_max)[-1]
-        tmp_df = self.to_data_frame()
-
-        sliced = self.from_data_frame(
-            df = tmp_df.iloc[x_min_index:x_max_index],
-            comment = self.comment + [f"sliced: x_min = {x_min}, x_max = {x_max}"],
-            condition = self.condition,
-            original_file_path = self.original_file_path
-            )
-
-        return sliced
-
-        pass
-    
-    def __repr__(self):
-        return self.data_name+": "+str(type(self))+"\n"+self.to_data_frame().__repr__()
-    
-    def plot(
-        self, 
-        fig: Optional[Figure]=None,
-        ax: Optional[Axes]=None,
-        **kargs
-        )->tuple[Figure, Axes]:
-        """
-        データの簡易プロット用クラスメソッド
-        figとaxは書き換える。
-        """
-        match fig:
-            case None:
-                _fig = plt.figure(figsize = (4,3))
-            case _:
-                _fig = fig
-        
-        match ax:
-            case None:
-                _ax = _fig.add_axes((0.2,0.2,0.7,0.7))
-            
-            case _:
-                _ax = ax
-
-        _ax.plot(self.x,self.y, **kargs)
-        return (_fig, _ax)
 
 
 @dataclass(frozen=True)
