@@ -82,6 +82,40 @@ def test_construction_and_validation() -> None:
     _assert_raises(ValueError, lambda: PotentialArray([[1.0, 2.0]]))  # 次元不一致
 
 
+def test_construction_from_ndarray() -> None:
+    a_1d = np.array([1, 2, 3])
+    a_2d = np.array([[1, 2, 3], [4, 5, 6]])
+    # 型の入れ子の深さと ndarray の次元数が一致する場合のみ構築できる
+    a = QArray[Potential](a_1d)
+    assert type(a) is QArray[Potential]
+    assert a.dtype == np.float64  # int64 からの変換
+    _assert_raises(ValueError, lambda: QArray[Potential](a_2d))
+    _assert_raises(ValueError, lambda: QArray[QArray[Potential]](a_1d))
+    d = QArray[QArray[Potential]](a_2d)
+    assert type(d) is QArray[QArray[Potential]]
+    # スカラー(0次元)も次元不一致
+    _assert_raises(ValueError, lambda: QArray[Potential](5.0))
+    # 変換不能な入力(入力検証なので消してはいけないエラー)
+    _assert_raises(ValueError, lambda: QArray[Potential]([[1.0], [2.0, 3.0]]))
+    _assert_raises(TypeError, lambda: QArray[Potential]([1 + 2j]))
+    # 期待次元の問い合わせ
+    assert QArray[Potential].expected_ndim() == 1
+    assert QArray[QArray[Potential]].expected_ndim() == 2
+    _assert_raises(TypeError, lambda: QArray.expected_ndim())
+
+
+def test_construction_copies_input() -> None:
+    source = np.array([1.0, 2.0, 3.0])
+    p_array = PotentialArray(source)
+    # コンストラクタは常に防御的コピーを保持する(外部からの変更が波及しない)
+    assert not np.shares_memory(p_array, source)
+    source[0] = 99.0
+    assert float(p_array[0]) == 1.0
+    # ゼロコピーが必要な場合は view を使う(不変条件は検証される)
+    shared = source.view(PotentialArray)
+    assert np.shares_memory(shared, source)
+
+
 def test_scalar_access_and_slice() -> None:
     p_array = PotentialArray([1.2, 1.5, 1.8])
     # int 添字 -> 葉の物理量型

@@ -173,16 +173,23 @@ class QArray(np.ndarray, Generic[ElemT]):
         引数
             values: 配列に変換可能な値(list, ndarray, 物理量のリスト等)。
                     次元数はクラスの期待次元(入れ子の深さ)と一致すること。
+                    常に防御的コピーを保持する(入力配列とバッファを共有
+                    しない)。ゼロコピーが必要な場合は
+                    ndarray.view(QArray[X]) を使う(不変条件は
+                    __array_finalize__ が検証する)。
         返り値
             cls 型のインスタンス(実体は _dtype の ndarray)。
         エラー
             要素型未指定(裸の QArray)は TypeError。次元数不一致は ValueError。
+            変換不能な入力は numpy 由来のエラーをそのまま通す
+            (不揃いなリスト・文字列は ValueError、complex -> float64 の
+            ような型として不可能な変換は TypeError)。
         """
         if not hasattr(cls, "_element_type"):
             raise TypeError(
                 "QArray は要素型を指定して使う(例: QArray[Potential]([...]))"
             )
-        array_data = np.asarray(values, dtype=cls._dtype)
+        array_data = np.array(values, dtype=cls._dtype)
         if array_data.ndim != cls._expected_ndim:
             raise ValueError(
                 "{} は {} 次元の配列を要求するが、{} 次元の入力が渡された".format(
@@ -213,6 +220,24 @@ class QArray(np.ndarray, Generic[ElemT]):
             )
 
     # ---------------- 次元と特殊化クラスの対応 ----------------
+
+    @classmethod
+    def expected_ndim(cls) -> int:
+        """
+        このクラスが受け付ける配列の次元数(= 型の入れ子の深さ)を返す。
+
+        例
+            QArray[Potential].expected_ndim()          # -> 1
+            QArray[QArray[Potential]].expected_ndim()  # -> 2
+
+        入れ子の再帰的な解決は __class_getitem__ が特殊化クラスの生成時に
+        済ませている(内側のクラスの値 + 1)ため、ここでは定数を返すだけ。
+        エラー
+            特殊化されていない裸の QArray に対して呼ぶと TypeError。
+        """
+        if not hasattr(cls, "_element_type"):
+            raise TypeError("特殊化されていない QArray に次元数はない")
+        return cls._expected_ndim
 
     @classmethod
     def _class_for_ndim(cls, ndim: int) -> type[np.ndarray]:
