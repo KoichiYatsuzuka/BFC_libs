@@ -31,6 +31,8 @@ import abc
 from typing import ClassVar, Generic, Self, SupportsComplex, SupportsFloat
 from typing import TypeGuard, TypeVar, cast, overload
 
+import numpy as np
+
 
 class QuantityBase(abc.ABC):
     """
@@ -60,11 +62,13 @@ class QuantityBase(abc.ABC):
         引数
             other: 判定対象。演算・比較の右辺(または左辺)に来た値。
         返り値
-            True なら int/float 系のスカラー(np.float64 は float のサブクラス
-            なのでスカラー扱い)。np.int64 等の numpy 整数は int のサブクラス
-            ではないため False(その場合の演算は numpy 側に委譲される)。
+            True なら無次元スカラー扱い。Python の int/float に加えて、
+            numpy のスカラー型(np.int64, np.float32 など)も含む
+            (mean() の内部などで numpy 整数スカラーによる除算が発生するため)。
         """
-        return isinstance(other, (int, float)) and not isinstance(other, QuantityBase)
+        return isinstance(
+            other, (int, float, np.integer, np.floating)
+        ) and not isinstance(other, QuantityBase)
 
     def _is_same_quantity(self, other: object) -> TypeGuard[Self]:
         """
@@ -154,6 +158,10 @@ class Quantity(float, QuantityBase):
     @overload
     def __add__(self, other: complex) -> complex: ...
     def __add__(self, other: complex) -> Self | float | complex:
+        if isinstance(other, np.ndarray):
+            # 配列との演算は ndarray / QArray 側の規則に委譲する
+            # (自分を素の float に落とすと配列側の型保存判定が働かなくなる)
+            return NotImplemented
         if self._is_same_quantity(other):
             return type(self)(float(self) + other)
         return float(self) + other
@@ -176,6 +184,8 @@ class Quantity(float, QuantityBase):
     @overload
     def __sub__(self, other: complex) -> complex: ...
     def __sub__(self, other: complex) -> Self | float | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_same_quantity(other):
             return type(self)(float(self) - other)
         return float(self) - other
@@ -198,6 +208,8 @@ class Quantity(float, QuantityBase):
     @overload
     def __mul__(self, other: complex) -> complex: ...
     def __mul__(self, other: complex) -> Self | float | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_plain_scalar(other):
             return type(self)(float(self) * other)
         # 物理量が相手のときは両辺を素の値に落とす。自分側だけ落とすと、
@@ -231,6 +243,8 @@ class Quantity(float, QuantityBase):
     @overload
     def __truediv__(self, other: complex) -> complex: ...
     def __truediv__(self, other: complex) -> Self | float | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_plain_scalar(other):
             return type(self)(float(self) / other)
         if isinstance(other, QuantityBase):
@@ -425,10 +439,12 @@ class ComplexQuantity(complex, QuantityBase, Generic[RealT]):
             True ならスカラー扱い。複素スカラー倍は次元を変えないため、
             ComplexQuantity では complex もスカラーに含まれる
             (float 実体の Quantity とは規則が異なる点に注意)。
+            numpy のスカラー型(np.complex64 など)も含む。
         """
-        return isinstance(other, (int, float, complex)) and not isinstance(
-            other, QuantityBase
-        )
+        return isinstance(
+            other,
+            (int, float, complex, np.integer, np.floating, np.complexfloating),
+        ) and not isinstance(other, QuantityBase)
 
     @property
     def value(self) -> complex:
@@ -465,6 +481,9 @@ class ComplexQuantity(complex, QuantityBase, Generic[RealT]):
     @overload
     def __add__(self, other: complex) -> complex: ...
     def __add__(self, other: complex) -> Self | complex:
+        if isinstance(other, np.ndarray):
+            # 配列との演算は ndarray / QArray 側の規則に委譲する
+            return NotImplemented
         if self._is_same_quantity(other):
             return type(self)(complex(self) + other)
         return complex(self) + other
@@ -477,6 +496,8 @@ class ComplexQuantity(complex, QuantityBase, Generic[RealT]):
     @overload
     def __sub__(self, other: complex) -> complex: ...
     def __sub__(self, other: complex) -> Self | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_same_quantity(other):
             return type(self)(complex(self) - other)
         return complex(self) - other
@@ -493,6 +514,8 @@ class ComplexQuantity(complex, QuantityBase, Generic[RealT]):
     @overload
     def __mul__(self, other: complex) -> Self: ...
     def __mul__(self, other: complex) -> Self | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_plain_complex_scalar(other):
             return type(self)(complex(self) * other)
         # 物理量が相手のときは両辺を素の値に落とす(Quantity 側と同じ理由)。
@@ -520,6 +543,8 @@ class ComplexQuantity(complex, QuantityBase, Generic[RealT]):
     @overload
     def __truediv__(self, other: complex) -> Self: ...
     def __truediv__(self, other: complex) -> Self | complex:
+        if isinstance(other, np.ndarray):
+            return NotImplemented
         if self._is_plain_complex_scalar(other):
             return type(self)(complex(self) / other)
         if isinstance(other, QuantityBase):
