@@ -11,7 +11,7 @@ import math
 
 import numpy as np
 
-from quantity import Quantity, QuantityBase
+from quantity import ComplexQuantity, Quantity, QuantityBase
 
 
 # テスト用の物理量クラス(利用側の宣言方法と同じ形)
@@ -20,6 +20,19 @@ class Potential(Quantity):
 
 
 class Current(Quantity):
+    pass
+
+
+class Resistance(Quantity):
+    pass
+
+
+class Impedance(ComplexQuantity[Resistance]):
+    _real_type = Resistance
+
+
+class CurrentC(ComplexQuantity):
+    # _real_type 未指定の複素物理量(real/imag/abs は素の float に落ちる)
     pass
 
 
@@ -176,6 +189,136 @@ def test_numpy_interoperability() -> None:
     assert math.isclose(float(array.sum()), 1.5)
     # ufunc に単体で渡すと numpy スカラーに降格する(次元が変わる演算相当)
     assert isinstance(np.sqrt(Potential(4.0)), np.float64)
+
+
+def test_complex_construction() -> None:
+    z = Impedance(3 + 4j)
+    assert type(z) is Impedance
+    assert complex(z) == 3 + 4j
+    assert float(Impedance(2.5).real) == 2.5
+    assert complex(Impedance(np.complex128(1 + 2j))) == 1 + 2j
+    _assert_raises(TypeError, lambda: Impedance("1+2j"))  # type: ignore[arg-type]
+
+
+def test_complex_value_property() -> None:
+    z = Impedance(3 + 4j)
+    assert type(z.value) is complex
+    assert z.value == 3 + 4j
+
+
+def test_complex_add_sub() -> None:
+    z1 = Impedance(3 + 4j)
+    z2 = Impedance(1 - 2j)
+    added = z1 + z2
+    assert type(added) is Impedance
+    assert complex(added) == 4 + 2j
+    subed = z1 - z2
+    assert type(subed) is Impedance
+    assert complex(subed) == 2 + 6j
+    # 異なる物理量・素のスカラーとの加減算は complex に降格
+    assert type(z1 + CurrentC(1j)) is complex
+    assert type(z1 + 1j) is complex
+    assert type(1j + z1) is complex
+    assert type(z1 - 2.0) is complex
+    assert type(z1 + Resistance(1.0)) is complex
+    assert type(Resistance(1.0) + z1) is complex
+
+
+def test_complex_scalar_mul_div_keeps_type() -> None:
+    z = Impedance(3 + 4j)
+    for result in (z * 2, 2 * z, z * 2.0, 2.0 * z):
+        assert type(result) is Impedance
+        assert complex(result) == 6 + 8j
+    # 複素スカラー倍も次元不変なので型を保つ(Quantity と異なる規則)
+    rotated = z * 1j
+    assert type(rotated) is Impedance
+    assert complex(rotated) == -4 + 3j
+    assert type(1j * z) is Impedance
+    assert type(z * np.complex128(1j)) is Impedance
+    halved = z / 2
+    assert type(halved) is Impedance
+    assert complex(halved) == 1.5 + 2j
+    assert type(z / 1j) is Impedance
+
+
+def test_complex_mul_div_degrade() -> None:
+    z1 = Impedance(3 + 4j)
+    z2 = Impedance(1 - 2j)
+    r = Resistance(2.0)
+    # 同じ型同士の * / は次元が変わるので complex
+    assert type(z1 * z2) is complex
+    assert type(z1 / z1) is complex
+    assert abs(z1 / z1 - 1.0) < 1e-12
+    # 実数物理量との乗除も complex(Quantity 側の降格分岐の検証を含む)
+    assert type(z1 * r) is complex
+    assert type(r * z1) is complex
+    assert type(z1 / r) is complex
+    assert type(r / z1) is complex
+    # スカラー / ComplexQuantity は次元が反転するので complex
+    assert type(2.0 / z1) is complex
+    assert type(1j / z1) is complex
+
+
+def test_complex_real_imag_abs() -> None:
+    z = Impedance(3 + 4j)
+    assert type(z.real) is Resistance
+    assert float(z.real) == 3.0
+    assert type(z.imag) is Resistance
+    assert float(z.imag) == 4.0
+    assert type(abs(z)) is Resistance
+    assert float(abs(z)) == 5.0
+    # _real_type 未指定のサブクラスは素の float に落ちる
+    cc = CurrentC(3 + 4j)
+    assert type(cc.real) is float
+    assert type(abs(cc)) is float
+
+
+def test_complex_conjugate_neg() -> None:
+    z = Impedance(3 + 4j)
+    conj = z.conjugate()
+    assert type(conj) is Impedance
+    assert complex(conj) == 3 - 4j
+    negated = -z
+    assert type(negated) is Impedance
+    assert complex(negated) == -3 - 4j
+    assert type(+z) is Impedance
+
+
+def test_complex_pow() -> None:
+    z = Impedance(3 + 4j)
+    powered = z**2
+    assert type(powered) is complex
+    assert powered == -7 + 24j
+
+
+def test_complex_eq_hash() -> None:
+    z = Impedance(3 + 4j)
+    assert z == Impedance(3 + 4j)
+    assert not (z == Impedance(1 - 2j))
+    # プリミティブ complex との比較は許可
+    assert z == 3 + 4j
+    # 異なる物理量同士の比較は禁止(入力検証としての TypeError)
+    _assert_raises(TypeError, lambda: z == CurrentC(3 + 4j))
+    _assert_raises(TypeError, lambda: z == Resistance(3.0))
+    _assert_raises(TypeError, lambda: Resistance(3.0) == z)
+    assert hash(z) == hash(3 + 4j)
+
+
+def test_complex_isinstance_relations() -> None:
+    z = Impedance(3 + 4j)
+    assert isinstance(z, complex)
+    assert isinstance(z, ComplexQuantity)
+    assert isinstance(z, QuantityBase)
+    assert not isinstance(z, float)
+    assert not isinstance(3 + 4j, QuantityBase)
+
+
+def test_complex_numpy_interoperability() -> None:
+    z1 = Impedance(3 + 4j)
+    z2 = Impedance(1 - 2j)
+    array = np.array([z1, z2])
+    assert array.dtype == np.complex128
+    assert array.sum() == 4 + 2j
 
 
 if __name__ == "__main__":
