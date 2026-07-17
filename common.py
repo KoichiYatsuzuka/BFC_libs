@@ -901,8 +901,10 @@ def is_vo(self: Union[ValObj,ValueObjectArray[ValObj]])->TypeGuard[ValObj]:
     
 
 
-X = TypeVar('X', ValueObjectArray, np.ndarray)
-Y = TypeVar('Y', ValueObjectArray, np.ndarray)
+# DataSeriese の x/y 系列の型。旧 ValueObjectArray と新 QArray はどちらも
+# np.ndarray のサブクラスなので、bound で両方を受け入れる(移行期間中の措置)。
+X = TypeVar('X', bound=np.ndarray)
+Y = TypeVar('Y', bound=np.ndarray)
 
 @dataclass(frozen=True, repr=False)
 class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):

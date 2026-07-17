@@ -313,6 +313,56 @@ def test_complex_array() -> None:
     assert type(cc_array.real) is np.ndarray
 
 
+def test_find() -> None:
+    p_array = PotentialArray([0.0, 1.0, 2.0, 1.0, 0.0])
+    # 符号反転による交差検出(左側要素のインデックス)
+    assert list(p_array.find(1.5)) == [1, 2]
+    # 完全一致(頂点なので交差は検出されない)
+    assert list(p_array.find(Potential(2.0))) == [2]
+    # begin_index を指定しても絶対インデックスで返る
+    assert list(p_array.find(1.5, begin_index=2)) == [2]
+    # 見つからなければ空
+    assert len(p_array.find(10.0)) == 0
+    # 不正な範囲・非対応の系列は入力検証エラー
+    _assert_raises(IndexError, lambda: p_array.find(1.0, begin_index=-1))
+    _assert_raises(
+        IndexError, lambda: p_array.find(1.0, begin_index=4, end_index=2)
+    )
+    _assert_raises(TypeError, lambda: ImpedanceArray([1j, 2j]).find(1.0))
+    _assert_raises(
+        TypeError, lambda: PotentialMatrix([[1.0, 2.0], [3.0, 4.0]]).find(1.0)
+    )
+
+
+def test_normalize() -> None:
+    p_array = PotentialArray([1.0, 2.0, 3.0])
+    normalized = p_array.normalize()
+    assert type(normalized) is PotentialArray
+    assert list(normalized.float_array()) == [0.0, 0.5, 1.0]
+    # 自身は変更されない
+    assert float(p_array[0]) == 1.0
+    # 範囲指定: [0, 3) の min/max (0 と 2) を基準に全体を規格化
+    windowed = PotentialArray([0.0, 1.0, 2.0, 4.0]).normalize(end_index=3)
+    assert float(windowed[3]) == 2.0
+
+
+def test_join() -> None:
+    p1 = PotentialArray([1.0, 2.0])
+    p2 = PotentialArray([3.0])
+    joined = p1.join(p2)
+    assert type(joined) is PotentialArray
+    assert list(joined.float_array()) == [1.0, 2.0, 3.0]
+    # 旧互換の & 演算子
+    assert list((p1 & p2).float_array()) == [1.0, 2.0, 3.0]
+    # 2次元は行方向に連結
+    matrix = PotentialMatrix([[1.0, 2.0], [3.0, 4.0]])
+    stacked = matrix.join(matrix)
+    assert type(stacked) is PotentialMatrix
+    assert stacked.shape == (4, 2)
+    # 型が違えば入力検証エラー
+    _assert_raises(TypeError, lambda: p1.join(CurrentArray([1.0])))
+
+
 def test_float_array_compat() -> None:
     p_array = PotentialArray([1.0, 2.0])
     plain = p_array.float_array()

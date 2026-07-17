@@ -32,7 +32,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any, ClassVar, Generic, Self, SupportsIndex
+from typing import Any, ClassVar, Generic, Self, SupportsFloat, SupportsIndex
 from typing import TypeVar, cast, overload
 
 import numpy as np
@@ -463,6 +463,101 @@ class QArray(np.ndarray, Generic[ElemT]):
     def complex_array(self) -> NDArray[np.complex128]:
         """旧 ValueObjectArray 互換。素の complex128 ndarray のコピーを返す。"""
         return np.array(self.view(np.ndarray), dtype=np.complex128)
+
+    # ------- データ系列向けユーティリティ(旧 ValueObjectArray 互換) -------
+
+    def find(
+        self,
+        target_value: SupportsFloat,
+        begin_index: int = 0,
+        end_index: int | None = None,
+    ) -> NDArray[np.intp]:
+        """
+        系列が target_value と交差する位置のインデックス配列を返す
+        (隣接要素間で符号が反転する箇所と、値が完全一致する箇所)。
+        DataSeriese.slice() などが x 軸上の値から添字を引くために使う。
+
+        引数
+            target_value: 探す値。葉の物理量でも素の float でも良い。
+            begin_index, end_index: 探索範囲 [begin, end)。省略時は全範囲。
+        返り値
+            交差点の絶対インデックス(配列全体基準)の昇順配列。
+            見つからなければ空配列。
+        エラー
+            範囲指定が不正なら IndexError、float 系列以外(complex・多次元)
+            は TypeError(いずれも入力検証)。
+
+        例
+            PotentialArray([0.0, 1.0, 2.0, 1.0]).find(1.5)  # -> [1, 2]
+        """
+        if self.ndim != 1 or self.dtype != np.float64:
+            raise TypeError(
+                "find は 1 次元の float 系列専用: {} (ndim={})".format(
+                    type(self).__name__, self.ndim
+                )
+            )
+        _end_index = len(self) if end_index is None else end_index
+        if begin_index < 0 or begin_index > _end_index or _end_index > len(self):
+            raise IndexError(
+                "不正な探索範囲: begin={}, end={}, length={}".format(
+                    begin_index, _end_index, len(self)
+                )
+            )
+        raw = self.view(np.ndarray)[begin_index:_end_index]
+        difference = raw - float(target_value)
+        # 符号が反転する箇所(左側要素のインデックス)と完全一致の箇所
+        crossing_indexes = np.where(difference[1:] * difference[:-1] < 0.0)[0]
+        exact_indexes = np.where(difference == 0.0)[0]
+        merged_indexes = np.sort(np.append(crossing_indexes, exact_indexes))
+        return merged_indexes + begin_index
+
+    def normalize(
+        self,
+        begin_index: int | None = None,
+        end_index: int | None = None,
+    ) -> Self:
+        """
+        範囲 [begin, end) 内の最小値・最大値を基準に、配列全体を 0-1 に
+        規格化した新しい配列を返す。自身は変更しない。
+
+        引数
+            begin_index, end_index: 基準となる最小・最大を探す範囲。
+                                    省略時は全範囲。
+        返り値
+            規格化された配列。値は無次元になるが、旧 ValueObjectArray との
+            互換のため型は保つ(規格化後も find やプロットを型付きで
+            続行できるようにする意図的な例外)。
+        """
+        _begin_index = 0 if begin_index is None else begin_index
+        _end_index = len(self) if end_index is None else end_index
+        raw = self.view(np.ndarray)
+        reference_window = raw[_begin_index:_end_index]
+        min_value = reference_window.min()
+        max_value = reference_window.max()
+        return type(self)((raw - min_value) / (max_value - min_value))
+
+    def join(self, another: Self) -> Self:
+        """
+        同じ型の配列を末尾に連結した新しい配列を返す。自身は変更しない。
+        (2 次元では行方向に連結する)
+
+        エラー
+            型が違えば TypeError(入力検証)。
+        """
+        if type(another) is not type(self):
+            raise TypeError(
+                "join は同じ型同士に限る: {} と {}".format(
+                    type(self).__name__, type(another).__name__
+                )
+            )
+        joined = np.concatenate(
+            [self.view(np.ndarray), another.view(np.ndarray)]
+        )
+        return type(self)(joined)
+
+    def __and__(self, another: Self) -> Self:  # type: ignore[override]
+        """旧 ValueObjectArray 互換の連結演算子(join と同じ)。"""
+        return self.join(another)
 
 
 def _degrade_nested(value: object) -> object:
