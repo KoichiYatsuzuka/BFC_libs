@@ -20,6 +20,14 @@ from matplotlib.axes import Axes
 from copy import deepcopy as copy
 from functools import wraps
 import codecs
+
+try:
+    from .quantity import Quantity
+    from .quantity_array import QArray
+except ImportError:
+    # リポジトリ直下から直接 import する場合(パッケージ外実行)
+    from quantity import Quantity
+    from quantity_array import QArray
 #import inspect
 #from numba import jit
 
@@ -1308,16 +1316,11 @@ class Point:
 #---------------common object values-------------------
 #------------------------------------------------------	
         
-class Time(ValueObject):
+class Time(Quantity):
+    """時間 [s]。新 Quantity 系(実体 float)の物理量。"""
     pass
-"""
-Time_Array = NewType("Time_Array", ValueObjectArray[Time])
-"""
-class TimeArray(ValueObjectArray):
-    def __new__(cls, obj, dtype=Time, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
-    pass
+
+TimeArray = QArray[Time]
 
 #------------------------------------------------------
 #-------------------functions--------------------------

@@ -26,7 +26,8 @@ from typing import Final, NewType, Optional, Union, TypeAlias, Self, overload, o
 from enum import Enum
 
 from .. import common as cmn
-from ..common import ValueObject, ValueObjectArray
+from ..quantity import ComplexQuantity, Quantity
+from ..quantity_array import QArray
 
 # distutils: language=c++
 # distutils: extra_compile_args = ["-O3"]
@@ -36,148 +37,107 @@ from ..common import ValueObject, ValueObjectArray
 #---------------------------------------------------------------
 
 
-class Current(ValueObject):
+class Current(Quantity):
     """
+    電流 [A]。実体 float のブランド付き物理量。
     note: iR correction can be performed via iR_correction()
     """
-    @cmn.immutator
     def log10(self)->LogCurrent:
-        return LogCurrent(float(np.log10(np.abs(self.value))))
-    
-    @cmn.immutator
-    def iR_correction(self, registance: Resistance):
-        return Potential(self.value*registance.value)
+        """log10(|I|) を LogCurrent として返す。"""
+        return LogCurrent(float(np.log10(np.abs(float(self)))))
+
+    def iR_correction(self, registance: Resistance)->Potential:
+        """iR 降下 (I x R) を Potential として返す。"""
+        return Potential(float(self)*float(registance))
+
+
+class CurrentC(ComplexQuantity):
+    """複素電流。"""
     pass
 
-class CurrentC(cmn.ValueObjectComplex):
-    pass
 
-class CurrentArray(ValueObjectArray[Current]):
-
-    def __new__(cls, obj, dtype=Current, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
-    
-
-    @cmn.immutator
+class CurrentArray(QArray[Current]):
+    """
+    電流の配列。カスタムメソッドを持つため QArray[Current] のエイリアスでは
+    なく継承クラス(電流配列はこのクラス名に統一して使うこと)。
+    """
     def log10(self)->LogCurrentArray:
-        """list_tmp = []
-        for val in self:
-            list_tmp.append(val.log10())"""
-        
-
+        """log10(|I|) の配列を返す。"""
         return LogCurrentArray(np.log10(np.abs(self.float_array())))
-    
-    @cmn.immutator
-    def iR_correction(self, registance: Resistance):
-        list_tmp = []
-        for val in self:
-            list_tmp.append(val.iR_correction(registance))
-        return PotentialArray(list_tmp)
-    
-    pass
 
-class CurrentCArray(cmn.ValueObjectArray[CurrentC]):
-    def __new__(cls, obj, dtype=CurrentC, meta: Optional[str] = None):
+    def iR_correction(self, registance: Resistance)->PotentialArray:
+        """iR 降下 (I x R) の配列を返す(ベクトル演算)。"""
+        return PotentialArray(self.float_array()*float(registance))
 
-        return super().__new__(cls, obj, dtype, meta)
-    
-    pass
 
-class Resistance(cmn.ValueObject):
-    
+CurrentCArray = QArray[CurrentC]
+
+
+class Resistance(Quantity):
+    """抵抗 [Ohm]。"""
     def to_impedance(self)->Impedance:
-        return Impedance(self.value)
-    
-class ResistanceArray(cmn.ValueObjectArray[Resistance]):
-    def __new__(cls, obj, dtype=Resistance, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
+        return Impedance(float(self))
+
+
+class ResistanceArray(QArray[Resistance]):
+    """抵抗の配列。to_impedance を持つため継承クラス。"""
     def to_impedance(self)->ImpedanceArray:
-        return ImpedanceArray([val.to_impedance() for val in self])
+        return ImpedanceArray(self.complex_array())
 
 
-class Potential(ValueObject):
+class Potential(Quantity):
+    """
+    電位 [V]。
+    Potential / Current -> Resistance のオーム則除算を明示的に定義している
+    (次元をまたぐ意味のある演算はサブクラスで個別に定義する方針)。
+    """
+    # Current は float のサブクラスなので overload の重複は原理的に避けられない
+    # (意図的な特殊化のため抑制する)
     @overload
-    def __truediv__(self, dived_value: Current)->Resistance:
-        ...
-    
+    def __truediv__(self, other: Current)->Resistance: ...  # pyright: ignore[reportOverlappingOverload]
     @overload
-    def __truediv__(self, dived_value: Union[int, float, Self])->Self:
-        ...
-
+    def __truediv__(self, other: Quantity)->float: ...
+    @overload
+    def __truediv__(self, other: float)->Self: ...
+    @overload
+    def __truediv__(self, other: complex)->complex: ...
     @override
-    @cmn.immutator
-    def __truediv__(self, dived_value: Union[int, float, Self, Current]):
-        if type(dived_value) == Current:
-            cls_type = Resistance
-        
-        
-        elif not(type(dived_value) in cmn.OPERATION_ALLOWED_TYPES) and type(dived_value)!= type(self):
-            error_report = \
-                cmn.NOT_ALLOWED_ERROR_STR.format(str(str(cmn.OPERATION_ALLOWED_TYPES)), str(type(dived_value))).\
-                replace("<", "").replace(">", "")
-            raise TypeError(error_report)
-        else:
-            cls_type=type(self)
+    def __truediv__(  # type: ignore[override]  # オーム則のための意図的な特殊化
+        self, other: complex
+    )->Resistance | Self | float | complex:
+        if type(other) is Current:
+            return Resistance(float(self) / float(other))
+        return Quantity.__truediv__(self, other)
 
-        if isinstance(dived_value, ValueObject):
-            _div_value = dived_value.value
-        else:
-            _div_value = dived_value
-    
-        quotient = cls_type(self.value / _div_value)
-        return quotient
-    pass
 
-#PotentialArray= ValueObjectArray[Potential]
-class PotentialArray(ValueObjectArray[Potential]):
-    def __new__(cls, obj, dtype=Potential, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
+PotentialArray = QArray[Potential]
+
+
+class LogCurrent(Quantity):
+    """log10(電流)。値は無次元だがブランドを保持する。"""
     pass
 
 
-class LogCurrent(ValueObject):
+LogCurrentArray = QArray[LogCurrent]
+
+
+class Impedance(ComplexQuantity[Resistance]):
+    """
+    複素インピーダンス [Ohm]。
+    real / imag / abs() は対の実数型 Resistance でラップされて返る。
+    """
+    _real_type = Resistance
+
+
+ImpedanceArray = QArray[Impedance]
+
+
+class Frequency(Quantity):
+    """周波数 [Hz]。"""
     pass
 
-LogCurrentArray = NewType("LogCurrentArray", ValueObjectArray[LogCurrent])
 
-
-class Impedance(cmn.ValueObjectComplex[Resistance]):
-    @property
-    def real(self):
-        return Resistance(self.value.real)
-    
-    @property
-    def imag(self):
-        return Resistance(self.value.imag)
-    pass
-
-class ImpedanceArray(ValueObjectArray[Impedance]):
-    def __new__(cls, obj, dtype=Impedance, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
-    
-    @property
-    @override
-    def real(self):
-        return ResistanceArray(self.complex_array().real)
-    
-    @property
-    @override
-    def imag(self):
-        return ResistanceArray(self.complex_array().imag)
-    pass
-
-class Frequency(ValueObject):
-    pass
-
-class FrequencyArray(ValueObjectArray[Frequency]):
-    def __new__(cls, obj, dtype=Frequency, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
-    pass
+FrequencyArray = QArray[Frequency]
 
 #---------------------------------------------------------------
 #Objects relating to potential
@@ -211,7 +171,7 @@ def RHE(pH: float)->ReferenceElectrode:
 #Value object classes
 #---------------------------------------------------------------
 @dataclass(frozen=True, repr=False)
-class Voltammogram(cmn.DataSeriese[Potential, Current]):
+class Voltammogram(cmn.DataSeriese[PotentialArray, CurrentArray]):
     """
     ## The dataclass to treat voltammograms
     Can be used for LSV and CV.\n
@@ -302,11 +262,13 @@ class Voltammogram(cmn.DataSeriese[Potential, Current]):
         logI_back = np.delete(np.log10(np.abs(current_tmp)), [len_array-6, len_array-5, len_array-4, len_array-3, len_array-2, len_array-1])
         delta_logI = logI_for - logI_back
         
-        E_for = np.delete(self.potential, [0, 1, 2, 3, 4, 5])
-        E_back = np.delete(self.potential, [len_array-6, len_array-5, len_array-4, len_array-3, len_array-2, len_array-1])
-        delta_E: PotentialArray = E_for-E_back
+        # np.delete は QArray を素の ndarray に降格させるため、素の配列で計算する
+        potential_raw = self.potential.float_array()
+        E_for = np.delete(potential_raw, [0, 1, 2, 3, 4, 5])
+        E_back = np.delete(potential_raw, [len_array-6, len_array-5, len_array-4, len_array-3, len_array-2, len_array-1])
+        delta_E = E_for-E_back
 
-        Tafel_slope_raw = (delta_E*1000).float_array() / delta_logI
+        Tafel_slope_raw = delta_E*1000 / delta_logI
 
         tafel_slope_nparray = np.append(np.append([0, 0, 0], Tafel_slope_raw), [0, 0, 0])
 
@@ -612,20 +574,23 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
         return (_fig, _ax)
 
 
-    def get_resistance(self)->Optional[Resistance]: 
-        higher: ResistanceArray = np.delete(self.imaginary_Z, 0, 0)
-        lower: ResistanceArray = np.delete(self.imaginary_Z, -1, 0)
-        product : ResistanceArray = higher * lower
-        cross_indexes = np.where(product.float_array() < 0.0)[0]+1
-        
-        if len(cross_indexes>0):
+    def get_resistance(self)->Optional[Resistance]:
+        # 虚部の符号が反転する点(実軸との交点)での実部の最小値を返す。
+        # np.delete は QArray を素の ndarray に降格させるため、素の配列で計算する。
+        imaginary_raw = self.imaginary_Z.float_array()
+        higher = np.delete(imaginary_raw, 0)
+        lower = np.delete(imaginary_raw, -1)
+        product = higher * lower
+        cross_indexes = np.where(product < 0.0)[0]+1
+
+        if len(cross_indexes) > 0:
             return self._real_Z[cross_indexes].min()
         else:
             return None
 
 
 @dataclass(frozen=True, repr=False)
-class ChronoAmperogram(cmn.DataSeriese[cmn.Time, Current]):
+class ChronoAmperogram(cmn.DataSeriese[cmn.TimeArray, CurrentArray]):
     
     _time : cmn.TimeArray
     @property
@@ -711,7 +676,7 @@ To do
 to_data_frame関連の引数を修正
 """
 @dataclass(frozen=True, repr=False)
-class ChronoPotentiogram(cmn.DataSeriese[cmn.Time, Current]):
+class ChronoPotentiogram(cmn.DataSeriese[cmn.TimeArray, PotentialArray]):
     
     _time : cmn.TimeArray
     @property

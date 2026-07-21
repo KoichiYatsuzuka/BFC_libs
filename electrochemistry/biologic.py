@@ -104,9 +104,9 @@ class BiologicEISData(cmn.DataFile[ec.EIS]):
 
 		for i, cycle_range in enumerate (cycle_range_list):
 			tmp_eis = EIS(
-				_real_Z = ec.ResistanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
-				_imaginary_Z = ec.ResistanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end]), meta=file_path),
-				_frequency = ec.FrequencyArray(np.array(df["freq/Hz"][cycle_range.begin:cycle_range.end]), meta=file_path),
+				_real_Z = ec.ResistanceArray(np.array(df["Re(Z)/Ohm"][cycle_range.begin:cycle_range.end])),
+				_imaginary_Z = ec.ResistanceArray(np.array(df["-Im(Z)/Ohm"][cycle_range.begin:cycle_range.end])),
+				_frequency = ec.FrequencyArray(np.array(df["freq/Hz"][cycle_range.begin:cycle_range.end])),
 				_data_name = "",
 				_other_data = df.drop(columns=["Re(Z)/Ohm", "-Im(Z)/Ohm", "freq/Hz"])[cycle_range.begin:cycle_range.end].reset_index(),
 				_comment = ["file: "+cmn.extract_filename(file_path)],
@@ -296,7 +296,7 @@ def load_biologic_CV(
 		tmp_voltammogram = Voltammogram(
 			#_data_name = cmn.extract_filename(file_path) + " " + str(i+1) + "th cycle",
 			_data_name = data_name,
-			_potential = ec.PotentialArray(np.array(df["Ewe/V"][cycle_range.begin:cycle_range.end], dtype = Potential).astype(Potential)),
+			_potential = ec.PotentialArray(np.array(df["Ewe/V"][cycle_range.begin:cycle_range.end])),
 			_current = ec.CurrentArray(np.array(df["<I>/mA"][cycle_range.begin:cycle_range.end]/1000)),
 			_RE = reference_electrode,
 			#_conditions = raw_txt_lines[:num_skip_lines-1],
