@@ -10,26 +10,21 @@ from typing import Union, Optional
 
 from .. import common as cmn
 
-class Absorption(cmn.ValueObject):
-	
+class Absorption(cmn.Quantity):
+	"""吸光度 [a.u.]。"""
 	pass
 
-class Wavelength(cmn.ValueObject):
+class Wavelength(cmn.Quantity):
+	"""波長 [nm]。"""
 	pass
 
-class AbsorptionArray(cmn.ValueObjectArray):
-	def __new__(cls, obj, dtype=Absorption, meta: Optional[str] = None):		
-		return super().__new__(cls, obj, dtype, meta)
-	pass
+AbsorptionArray = cmn.QArray[Absorption]
 
-class WavelengthArray(cmn.ValueObjectArray):
-	def __new__(cls, obj, dtype=Wavelength, meta: Optional[str] = None):		
-		return super().__new__(cls, obj, dtype, meta)
-	pass
+WavelengthArray = cmn.QArray[Wavelength]
 
 
 @dataclass(frozen=True)
-class UV_VisSpectrum(cmn.DataSeriese[Wavelength, Absorption]):
+class UV_VisSpectrum(cmn.DataSeriese[WavelengthArray, AbsorptionArray]):
 	
 	_wavelength: WavelengthArray
 	@property

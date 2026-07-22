@@ -62,7 +62,7 @@ class BioLogicVoltammogramData(cmn.DataFile):
 			)
 	
 	@cmn.immutator
-	def iR_correction(self, registance: ec.Registance)->BioLogicVoltammogramData:
+	def iR_correction(self, registance: ec.Resistance)->BioLogicVoltammogramData:
 		tmp_voltammograms = []
 		for voltammogram in self._data:
 			tmp_voltammograms.append(voltammogram.IR_correction(registance))

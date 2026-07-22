@@ -8,32 +8,25 @@ from typing import Optional, Self, Final
 from dataclasses import dataclass
 
 from .. import common as cmn
-from .. common import ValueObject, ValueObjectArray
 
 COLUMN_NAME_WAVENUMBER: Final[str] = "wavenumber"
 COLUMN_NAME_INTENSITY:Final[str] = "intensity"
 
-class Wavenumber(cmn.ValueObject):
+class Wavenumber(cmn.Quantity):
+    """ラマンシフト [cm-1]。"""
     pass
 
-class WavenumberArray(ValueObjectArray):
-    def __new__(cls, obj, dtype=Wavenumber, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
+WavenumberArray = cmn.QArray[Wavenumber]
+
+class RammanIntensity(cmn.Quantity):
+    """ラマン強度 [a.u.]。"""
     pass
 
-class RammanIntensity(ValueObject):
-    pass
-
-class RammanIntensityArray(ValueObjectArray):
-    def __new__(cls, obj, dtype=RammanIntensity, meta: Optional[str] = None):
-        
-        return super().__new__(cls, obj, dtype, meta)
-    pass
+RammanIntensityArray = cmn.QArray[RammanIntensity]
 
 
 @dataclass(frozen=True, repr=False)
-class RamanSpectrum(cmn.DataSeriese[Wavenumber, RammanIntensity]):
+class RamanSpectrum(cmn.DataSeriese[WavenumberArray, RammanIntensityArray]):
     _wavenumber: WavenumberArray
     _intensity: RammanIntensityArray
     

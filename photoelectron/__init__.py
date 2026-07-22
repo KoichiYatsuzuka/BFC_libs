@@ -10,21 +10,20 @@ from .. import common as cmn
 
 
 
-class PhotoelectronEnergy(cmn.ValueObject):
+class PhotoelectronEnergy(cmn.Quantity):
+    """光電子エネルギー(結合エネルギー) [eV]。"""
     pass
 
-class PhotoelectronEnergyArray(cmn.ValueObjectArray[PhotoelectronEnergy]):
-    def __new__(cls, obj, dtype=PhotoelectronEnergy, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+PhotoelectronEnergyArray = cmn.QArray[PhotoelectronEnergy]
 
-class PhotoelectronIntensity(cmn.ValueObject):
+class PhotoelectronIntensity(cmn.Quantity):
+    """光電子強度 [a.u.]。"""
     pass
-class PhotoelectronIntensityArray(cmn.ValueObjectArray[PhotoelectronEnergy]):
-    def __new__(cls, obj, dtype=PhotoelectronIntensity, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+
+PhotoelectronIntensityArray = cmn.QArray[PhotoelectronIntensity]
 
 @dataclass(frozen=True, repr=False)
-class PhotoelectronSpectrum(cmn.DataSeriese[PhotoelectronEnergy, PhotoelectronIntensity]):
+class PhotoelectronSpectrum(cmn.DataSeriese[PhotoelectronEnergyArray, PhotoelectronIntensityArray]):
     _photoelectron_energy: PhotoelectronEnergyArray
     _photoelectron_intensity: PhotoelectronIntensityArray
 

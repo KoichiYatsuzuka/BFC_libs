@@ -978,14 +978,13 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
     _original_file_path: str
     _data_name : str
 
-
     @property
-    def x(self)->ValueObjectArray:
+    def x(self)->X:
         raise AttributeError("x getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class.")
         pass
 
     @property
-    def y(self)->ValueObjectArray:
+    def y(self)->Y:
         raise AttributeError("y getter of this class has not been overrided. Now this class is calling a vertual method in the abstracted parent class")
         pass
 
@@ -1260,20 +1259,18 @@ class DataFile(Generic[T], metaclass=abc.ABCMeta):
         return self._file_path
     
     @overload
-    def __getitem__(self, index: SupportsIndex)->T:
-        pass
-        return self._data[index]
+    def __getitem__(self, key: SupportsIndex)->T:
+        ...
     
     @overload
-    def __getitem__(self, slice: slice)->DataArray[T]:
-        pass
-        return self._data[slice]
+    def __getitem__(self, key: slice)->DataArray[T]:
+        ...
     
     @overload
-    def __getitem__(self, data_name: str)->T:
-        pass
+    def __getitem__(self, key: str)->T:
+        ...
 
-    def __getitem__(self, key: Union[SupportsIndex, slice, str]):
+    def __getitem__(self, key: Union[SupportsIndex, slice, str])->Union[T, DataArray[T]]:
         match key:
             case str():
                 for data in self._data:

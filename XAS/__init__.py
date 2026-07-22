@@ -10,70 +10,61 @@ from .. import common as cmn
 """
 To do: ChiR空間の変数の演算（実部^2 + 虚部^2 = 絶対値^2など）
 """
-class PhotonEnergy(cmn.ValueObject):
+class PhotonEnergy(cmn.Quantity):
+    """入射光子エネルギー [eV]。"""
     pass
 
-class PhotonEnergyArray(cmn.ValueObjectArray[PhotonEnergy]):
-    def __new__(cls, obj, dtype=PhotonEnergy, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
-    
-class ChiMu(cmn.ValueObject):
+PhotonEnergyArray = cmn.QArray[PhotonEnergy]
+
+class ChiMu(cmn.Quantity):
+    """規格化吸収 chi*mu。"""
     pass
 
-class ChiMuArray(cmn.ValueObjectArray[ChiMu]):
-    def __new__(cls, obj, dtype=ChiMu, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+ChiMuArray = cmn.QArray[ChiMu]
 
-class Frequency(cmn.ValueObject):
+class Frequency(cmn.Quantity):
     """in angstrom-1"""
     pass
 
-class FrequencyArray(cmn.ValueObjectArray[Frequency]):
-    def __new__(cls, obj, dtype=Frequency, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+FrequencyArray = cmn.QArray[Frequency]
 
-class Distance(cmn.ValueObject):
+class Distance(cmn.Quantity):
+    """動径距離 R [angstrom]。"""
     pass
 
-class DistanceArray(cmn.ValueObjectArray[Distance]):
-    def __new__(cls, obj, dtype=Distance, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+DistanceArray = cmn.QArray[Distance]
 
-class ChiR_Mag(cmn.ValueObject):
+class ChiR_Mag(cmn.Quantity):
+    """フーリエ変換 chi(R) の絶対値。"""
     pass
 
-class ChiR_MagArray(cmn.ValueObjectArray[ChiR_Mag]):
-    def __new__(cls, obj, dtype=ChiR_Mag, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+ChiR_MagArray = cmn.QArray[ChiR_Mag]
 
 
-class ChiR_Re(cmn.ValueObject):
+class ChiR_Re(cmn.Quantity):
+    """chi(R) の実部。"""
     pass
 
-class ChiR_ReArray(cmn.ValueObjectArray[ChiR_Re]):
-    def __new__(cls, obj, dtype=ChiR_Re, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+ChiR_ReArray = cmn.QArray[ChiR_Re]
 
 
-class ChiR_Im(cmn.ValueObject):
+class ChiR_Im(cmn.Quantity):
+    """chi(R) の虚部。"""
     pass
 
-class ChiR_ImArray(cmn.ValueObjectArray[ChiR_Im]):
-    def __new__(cls, obj, dtype=ChiR_Im, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+ChiR_ImArray = cmn.QArray[ChiR_Im]
 
 
-class ChiR_Phase(cmn.ValueObject):
+class ChiR_Phase(cmn.Quantity):
+    """chi(R) の位相。"""
     pass
 
-class ChiR_PhaseArray(cmn.ValueObjectArray[ChiR_Phase]):
-    def __new__(cls, obj, dtype=ChiR_Phase, meta: Optional[str] = None):
-        return super().__new__(cls, obj, dtype, meta)
+ChiR_PhaseArray = cmn.QArray[ChiR_Phase]
 
 
 
-@dataclass(frozen=True, repr=False)    
-class XAS(cmn.DataSeriese[PhotonEnergy, ChiMu]):
+@dataclass(frozen=True, repr=False)
+class XAS(cmn.DataSeriese[PhotonEnergyArray, ChiMuArray]):
     pass
 
 @dataclass(frozen=True, repr=False)

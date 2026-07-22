@@ -14,29 +14,21 @@ from typing import NewType
 #-------------classes--------------------
 #----------------------------------------
 
-class Theta(cmn.ValueObject):
+class Theta(cmn.Quantity):
+	"""回折角 2theta [deg]。"""
 	pass
 
-class DiffractionIntensity(cmn.ValueObject):
+class DiffractionIntensity(cmn.Quantity):
+	"""回折強度 [a.u.]。"""
 	pass
 
-#Theta_Array = NewType("Theta_Array", cmn.ValueObjectArray[Theta])
-#Diffracton_Intensity_Array = NewType("Diffracton_Intensity_Array", cmn.ValueObjectArray[DiffractionIntensity])
-
-class ThetaArray(cmn.ValueObjectArray[Theta]):
-	def __new__(cls, obj, dtype=Theta, meta: Optional[str] = None):		
-		return super().__new__(cls, obj, dtype, meta)
-	pass
-
-class DiffractionIntensityArray(cmn.ValueObjectArray[DiffractionIntensity]):
-	def __new__(cls, obj, dtype=DiffractionIntensity, meta: Optional[str] = None):		
-		return super().__new__(cls, obj, dtype, meta)
-	pass
+ThetaArray = cmn.QArray[Theta]
+DiffractionIntensityArray = cmn.QArray[DiffractionIntensity]
 
 
 
 @dataclass(frozen=True)
-class XRDPattern(cmn.DataSeriese[Theta, DiffractionIntensity]):
+class XRDPattern(cmn.DataSeriese[ThetaArray, DiffractionIntensityArray]):
 	_two_theta: ThetaArray
 	_intensity: DiffractionIntensityArray
 
