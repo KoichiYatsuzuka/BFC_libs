@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from copy import deepcopy as copy
 from typing import Union, Optional, Self
 
-from .. import common as cmn 
+from .. import common as cmn
+from .. import data_object as do
 from typing import NewType
 
 #----------------------------------------
@@ -28,7 +29,7 @@ DiffractionIntensityArray = cmn.QArray[DiffractionIntensity]
 
 
 @dataclass(frozen=True)
-class XRDPattern(cmn.DataSeriese[ThetaArray, DiffractionIntensityArray]):
+class XRDPattern(do.DataSeriese[ThetaArray, DiffractionIntensityArray]):
 	_two_theta: ThetaArray
 	_intensity: DiffractionIntensityArray
 

@@ -6,6 +6,7 @@ from typing import Optional, Self, NewType, Final
 from dataclasses import dataclass
 
 from .. import common as cmn
+from .. import data_object as do
 
 
 
@@ -23,7 +24,7 @@ class PhotoelectronIntensity(cmn.Quantity):
 PhotoelectronIntensityArray = cmn.QArray[PhotoelectronIntensity]
 
 @dataclass(frozen=True, repr=False)
-class PhotoelectronSpectrum(cmn.DataSeriese[PhotoelectronEnergyArray, PhotoelectronIntensityArray]):
+class PhotoelectronSpectrum(do.DataSeriese[PhotoelectronEnergyArray, PhotoelectronIntensityArray]):
     _photoelectron_energy: PhotoelectronEnergyArray
     _photoelectron_intensity: PhotoelectronIntensityArray
 

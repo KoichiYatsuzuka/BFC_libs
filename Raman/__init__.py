@@ -8,6 +8,7 @@ from typing import Optional, Self, Final
 from dataclasses import dataclass
 
 from .. import common as cmn
+from .. import data_object as do
 
 COLUMN_NAME_WAVENUMBER: Final[str] = "wavenumber"
 COLUMN_NAME_INTENSITY:Final[str] = "intensity"
@@ -26,7 +27,7 @@ RammanIntensityArray = cmn.QArray[RammanIntensity]
 
 
 @dataclass(frozen=True, repr=False)
-class RamanSpectrum(cmn.DataSeriese[WavenumberArray, RammanIntensityArray]):
+class RamanSpectrum(do.DataSeriese[WavenumberArray, RammanIntensityArray]):
     _wavenumber: WavenumberArray
     _intensity: RammanIntensityArray
     

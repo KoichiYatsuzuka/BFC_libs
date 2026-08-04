@@ -26,6 +26,7 @@ from typing import Final, NewType, Optional, Union, TypeAlias, Self, overload, o
 from enum import Enum
 
 from .. import common as cmn
+from .. import data_object as do
 from ..quantity import ComplexQuantity, Quantity
 from ..quantity_array import QArray
 
@@ -171,7 +172,7 @@ def RHE(pH: float)->ReferenceElectrode:
 #Value object classes
 #---------------------------------------------------------------
 @dataclass(frozen=True, repr=False)
-class Voltammogram(cmn.DataSeriese[PotentialArray, CurrentArray]):
+class Voltammogram(do.DataSeriese[PotentialArray, CurrentArray]):
     """
     ## The dataclass to treat voltammograms
     Can be used for LSV and CV.\n
@@ -446,7 +447,7 @@ class Voltammogram(cmn.DataSeriese[PotentialArray, CurrentArray]):
 
     
 @dataclass(frozen=True, repr=False)
-class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
+class EIS(do.DataSeriese[ResistanceArray, ResistanceArray]):
     _real_Z: ResistanceArray
     """in Ohm"""
     @property
@@ -590,7 +591,7 @@ class EIS(cmn.DataSeriese[ResistanceArray, ResistanceArray]):
 
 
 @dataclass(frozen=True, repr=False)
-class ChronoAmperogram(cmn.DataSeriese[cmn.TimeArray, CurrentArray]):
+class ChronoAmperogram(do.DataSeriese[cmn.TimeArray, CurrentArray]):
     
     _time : cmn.TimeArray
     @property
@@ -676,7 +677,7 @@ To do
 to_data_frame関連の引数を修正
 """
 @dataclass(frozen=True, repr=False)
-class ChronoPotentiogram(cmn.DataSeriese[cmn.TimeArray, PotentialArray]):
+class ChronoPotentiogram(do.DataSeriese[cmn.TimeArray, PotentialArray]):
     
     _time : cmn.TimeArray
     @property

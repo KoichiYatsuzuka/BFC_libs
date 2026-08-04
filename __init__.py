@@ -11,13 +11,15 @@ typing.Self型の使用 (>3.11)\n
 
 ## データ階層
 疑似的な抽象クラスを継承した、次のような階層になる
+(DataFile / DataArray / DataSeriese は data_object.py、
+ QArray / Quantity は quantity_array.py / quantity.py で定義)
     DataFile
-        :-DataSeriese(or list[DataSeriese])
-            :-ValueObjectArray(numpy.array)
-                :-[ValueObject, ValueObject, ValueObject, ..., ValueObject,]
-            :-ValueObjectArray  
-            :-ValueObjectArray  
-            ...
+        :-DataArray(or list[DataSeriese])
+            :-DataSeriese
+                :-QArray(numpy.ndarray, 実体は float64/complex128)
+                    :-[Quantity, Quantity, ..., Quantity]
+                :-QArray
+                ...
 ## 基本理念
 ・ 直観でPythonによるデータ読み込み、処理を可能とすること(pandas.read_csv()及びカラム処理の自動化)\n
 ・ プリミティブ型を極力使わないこと（値は値オブジェクトを用いる）\n

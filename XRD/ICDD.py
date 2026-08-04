@@ -109,5 +109,5 @@ class MillerIndex:
 @dataclass(frozen=True)
 class ICDD(xrd.XRDPattern):
     
-    d_value: cmn.ValueObjectArray
+    d_value: cmn.QArray
     Miller_index: MillerIndex

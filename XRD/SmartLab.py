@@ -1,5 +1,6 @@
 from .. import XRD as xrd
 from .. import common
+from .. import data_object
 from typing import Optional, Literal
 from dataclasses import dataclass
 from copy import deepcopy as copy
@@ -7,13 +8,13 @@ import pandas as pd
 import csv
 
 """@dataclass(frozen=True)
-class SmartLabData(common.DataFile[xrd.XRDPattern]):
+class SmartLabData(data_object.DataFile[xrd.XRDPattern]):
 	_xrd_data: xrd.XRDPattern
 	@property
 	def xrd_data(self):
 		return self._xrd_data
 	pass"""
-SmartLabData = common.DataFile[xrd.XRDPattern]
+SmartLabData = data_object.DataFile[xrd.XRDPattern]
 
 def read_smart_lab_1D_data(file_path: str, sep: Literal[" ", ","]=",")->SmartLabData:
 	skp_row_num = common.find_line_with_key(file_path,"#", encoding='Shift-JIS') + 1 # #Intensity_unit=cpsまで飛ばす

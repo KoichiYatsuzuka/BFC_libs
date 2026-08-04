@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ... import common as cmn
+from ... import data_object as do
 from ... import photoelectron as pes
 
-class VasaProbeData(cmn.DataFile[pes.PhotoelectronSpectrum]):
+class VasaProbeData(do.DataFile[pes.PhotoelectronSpectrum]):
 
     
     

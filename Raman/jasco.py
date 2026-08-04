@@ -6,11 +6,12 @@ from copy import deepcopy as copy
 import codecs
 
 from .. import common as cmn
+from .. import data_object as do
 from .. import Raman as rmn
 from .. Raman import RamanSpectrum
 
 
-class Jasco1DRamanDataFile(cmn.DataFile[rmn.RamanSpectrum]):
+class Jasco1DRamanDataFile(do.DataFile[rmn.RamanSpectrum]):
 
     @classmethod
     def load_file(cls, file_path: str):
@@ -42,7 +43,7 @@ class Jasco1DRamanDataFile(cmn.DataFile[rmn.RamanSpectrum]):
             _condition = conditions[1:],
             _file_path = file_path,
             _data_name = cmn.extract_filename(file_path),
-            _data = cmn.DataArray[RamanSpectrum]([spectrum], RamanSpectrum, file_path)
+            _data = do.DataArray[RamanSpectrum]([spectrum], RamanSpectrum, file_path)
         )
     
 

@@ -8,13 +8,14 @@ from typing import Optional, Self
 from enum import Enum
 
 from .. import common as cmn
+from .. import data_object as do
 from .. import XAS as xas
 
 class FileContentError(BaseException):
     pass
 
 @dataclass(frozen=True)
-class AthenaProjectEXAFS(cmn.DataFile[xas.InversedEXAFS]):
+class AthenaProjectEXAFS(do.DataFile[xas.InversedEXAFS]):
     pass
 
 def load_athena_EXAFS_file(chir_mag_file_path: str):
@@ -107,7 +108,7 @@ def load_athena_EXAFS_file(chir_mag_file_path: str):
         )
     
     return AthenaProjectEXAFS(
-        _data = cmn.DataArray(data_array),
+        _data = do.DataArray(data_array),
         _comment = [],
         _condition = [],
         _file_path = chir_mag_file_path,

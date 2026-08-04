@@ -9,6 +9,7 @@ from typing import Self
 from typing import Union, Optional
 
 from .. import common as cmn
+from .. import data_object as do
 
 class Absorption(cmn.Quantity):
 	"""吸光度 [a.u.]。"""
@@ -24,7 +25,7 @@ WavelengthArray = cmn.QArray[Wavelength]
 
 
 @dataclass(frozen=True)
-class UV_VisSpectrum(cmn.DataSeriese[WavelengthArray, AbsorptionArray]):
+class UV_VisSpectrum(do.DataSeriese[WavelengthArray, AbsorptionArray]):
 	
 	_wavelength: WavelengthArray
 	@property

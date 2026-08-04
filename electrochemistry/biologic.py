@@ -12,6 +12,7 @@ from nptyping import NDArray
 
 
 from .. import common as cmn
+from .. import data_object as do
 from ..common import immutator
 from . import ReferenceElectrode, Resistance, Voltammogram, Potential, Current, EIS
 from .. import electrochemistry as ec
@@ -39,9 +40,9 @@ def biologic_file_info(file_path)->BiologicFileInfo:
 	return BiologicFileInfo(num_skip_lines, num_skip_lines)
 
 @dataclass(frozen=True)
-class BioLogicVoltammogramData(cmn.DataFile):
+class BioLogicVoltammogramData(do.DataFile):
 
-	_data: cmn.DataArray[Voltammogram]
+	_data: do.DataArray[Voltammogram]
 
 	@property
 	def data(self):
@@ -67,14 +68,14 @@ class BioLogicVoltammogramData(cmn.DataFile):
 		for voltammogram in self._data:
 			tmp_voltammograms.append(voltammogram.IR_correction(registance))
 		return self.update(
-			cmn.DataArray[Voltammogram]((tmp_voltammograms)),
+			do.DataArray[Voltammogram]((tmp_voltammograms)),
 			f"iR_corrected {registance} Ohm"
 		)
 
 	pass
 
 @dataclass(frozen=True)
-class BiologicEISData(cmn.DataFile[ec.EIS]):
+class BiologicEISData(do.DataFile[ec.EIS]):
 
 	@classmethod
 	def load_file(cls, file_path: str, encoding = "UTF-8"):
@@ -117,17 +118,17 @@ class BiologicEISData(cmn.DataFile[ec.EIS]):
 
 
 		return BiologicEISData(
-			_data = cmn.DataArray[EIS](eis_list),
+			_data = do.DataArray[EIS](eis_list),
 			_data_name = cmn.extract_filename(file_path),
 			_comment = ["file: "+cmn.extract_filename(file_path)],
 			_condition = condition,
 			_file_path = file_path
 		)
 
-	"""_eis_ce_re: cmn.DataArray[ec.EIS]
+	"""_eis_ce_re: do.DataArray[ec.EIS]
 	
 
-	_eis_we_ce: cmn.DataArray[ec.EIS]"""
+	_eis_we_ce: do.DataArray[ec.EIS]"""
 
 
 	""""""
@@ -139,7 +140,7 @@ class BiologicEISData(cmn.DataFile[ec.EIS]):
 	pass
 
 @dataclass(frozen=True)
-class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
+class BiologicCAData(do.DataFile[ec.ChronoAmperogram]):
 	
 	@classmethod
 	def load_file(cls, file_path: str):
@@ -193,7 +194,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 			)
 		return BiologicCAData(
 			
-			cmn.DataArray[ec.ChronoAmperogram](ca_list),
+			do.DataArray[ec.ChronoAmperogram](ca_list),
 			_comment = ["file: "+cmn.extract_filename(file_path)],
 			_condition = condition,
 			_file_path = file_path,
@@ -203,7 +204,7 @@ class BiologicCAData(cmn.DataFile[ec.ChronoAmperogram]):
 	pass
 
 @dataclass(frozen=True)
-class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogram]):
+class BiologicCPData(do.DataFile[ec.ChronoPotentiogram]):
 	
 	@classmethod
 	def load_file(cls, file_path: str):
@@ -251,7 +252,7 @@ class BiologicCPData(cmn.DataFile[ec.ChronoPotentiogram]):
 			)
 		return BiologicCPData(
 			
-			cmn.DataArray[ec.ChronoPotentiogram](ca_list),
+			do.DataArray[ec.ChronoPotentiogram](ca_list),
 			_comment = ["file: "+cmn.extract_filename(file_path)],
 			_condition = condition,
 			_file_path = file_path,
@@ -311,7 +312,7 @@ def load_biologic_CV(
 
 
 	bl_voltammogram_data = BioLogicVoltammogramData(
-		_data = cmn.DataArray[Voltammogram](voltammograms_list), 
+		_data = do.DataArray[Voltammogram](voltammograms_list), 
 		_data_name = "",
 		_condition = condition,
 		_comment = ["file: "+cmn.extract_filename(file_path)],
@@ -361,7 +362,7 @@ def load_biologic_CV(
 
 
 	return BiologicEISData(
-		_data = cmn.DataArray[EIS](eis_list),
+		_data = do.DataArray[EIS](eis_list),
 		_data_name = cmn.extractS_filename(file_path),
 		_comment = ["file: "+cmn.extract_filename(file_path)],
 		_condition = condition,

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Self
 
 from .. import common as cmn
+from .. import data_object as do
 
 
 """
@@ -64,11 +65,11 @@ ChiR_PhaseArray = cmn.QArray[ChiR_Phase]
 
 
 @dataclass(frozen=True, repr=False)
-class XAS(cmn.DataSeriese[PhotonEnergyArray, ChiMuArray]):
+class XAS(do.DataSeriese[PhotonEnergyArray, ChiMuArray]):
     pass
 
 @dataclass(frozen=True, repr=False)
-class InversedEXAFS(cmn.DataSeriese[DistanceArray, ChiR_MagArray]):
+class InversedEXAFS(do.DataSeriese[DistanceArray, ChiR_MagArray]):
     
     _distance: DistanceArray
     @property

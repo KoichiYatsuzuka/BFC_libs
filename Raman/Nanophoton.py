@@ -6,13 +6,14 @@ from copy import deepcopy as copy
 import xarray as xr
 
 from .. import common as cmn
+from .. import data_object as do
 from .. import Raman as rmn
 from .. Raman import RamanSpectrum
 
 
 # @dataclass(frozen=True)
-# class NanophotonDataFile(cmn.DataFile):
-# 	_raman_spectra: cmn.DataArray[rmn.RamanSpectrum]
+# class NanophotonDataFile(do.DataFile):
+# 	_raman_spectra: do.DataArray[rmn.RamanSpectrum]
 # 	@property
 # 	def raman_spectra(self):
 # 		return self._raman_spectra
@@ -30,7 +31,7 @@ from .. Raman import RamanSpectrum
 # 			_comment = self.comment.append(added_comment)
 #         )
 
-Nanophoton1DDataFile = cmn.DataFile[rmn.RamanSpectrum]
+Nanophoton1DDataFile = do.DataFile[rmn.RamanSpectrum]
 	
 def read_peakfit_result(file_path: str):
 	raw_table = pd.read_csv(file_path, sep='\t')
@@ -93,6 +94,6 @@ def read_1D_data(file_path: str, encoding = "Shift-JIS")->Nanophoton1DDataFile:
 		_condition = conditions,
 		_file_path = file_path,
 		_data_name = cmn.extract_filename(file_path),
-		_data = cmn.DataArray[RamanSpectrum](spectra_tmp, RamanSpectrum, file_path)
+		_data = do.DataArray[RamanSpectrum](spectra_tmp, RamanSpectrum, file_path)
 	)
 

@@ -1,4 +1,5 @@
 from .. import common as cmn
+from .. import data_object as do
 from dataclasses import dataclass
 from typing import NewType
 import numpy as np
@@ -10,7 +11,7 @@ from typing import Union, Optional
 from .. import UV_vis
 
 @dataclass(frozen=True)
-class Kinetics(cmn.DataSeriese):
+class Kinetics(do.DataSeriese):
 	
 	_time: cmn.TimeArray
 	@property
@@ -39,15 +40,15 @@ class Kinetics(cmn.DataSeriese):
 
 #そのうち
 @dataclass(frozen=True)
-class ShimadzuSpectra(cmn.DataFile[UV_vis.UV_VisSpectrum]):
-	"""_spectra: cmn.DataArray[UV_vis.UV_VisSpectrum]
+class ShimadzuSpectra(do.DataFile[UV_vis.UV_VisSpectrum]):
+	"""_spectra: do.DataArray[UV_vis.UV_VisSpectrum]
 	@property
 	def spectra(self):
 		return self._spectra"""
 	pass
 
 @dataclass(frozen=True)
-class ShimadzuKinetics(cmn.DataFile):
+class ShimadzuKinetics(do.DataFile):
 	_kinetic_profile: Kinetics
 	@property
 	def kinetic_profile(self):
@@ -122,7 +123,7 @@ def load_spectrum_data(
 		_condition = conditions,
 		_file_path = file_path,
 		_data_name = cmn.extract_filename(file_path),
-		_data = cmn.DataArray[UV_vis.UV_VisSpectrum](spectra_list)
+		_data = do.DataArray[UV_vis.UV_VisSpectrum](spectra_list)
 	)
 	
 	return spectra_data
