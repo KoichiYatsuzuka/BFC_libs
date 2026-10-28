@@ -55,7 +55,7 @@ class UV_VisSpectrum(do.DataSeriese[WavelengthArray, AbsorptionArray]):
 		) -> Self:
 
 
-		return cls.__init__(
+		return cls(
 			_comment = comment,
 			_condition = condition,
 			_original_file_path = original_file_path,
@@ -89,6 +89,9 @@ class UV_VisSpectrum(do.DataSeriese[WavelengthArray, AbsorptionArray]):
 			self._absorption,
 			**kwargs
 		)
+		_ax.set_xlabel("Wavelength [nm]")
+		_ax.set_ylabel("Absorbance [a.u.]")
 
 		return (_fig, _ax)
+
 	
