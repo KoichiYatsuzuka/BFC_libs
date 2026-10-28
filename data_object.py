@@ -214,6 +214,9 @@ class DataSeriese(Generic[X, Y], metaclass=abc.ABCMeta):
         _ax.plot(self.x,self.y, **kargs)
         return (_fig, _ax)
 
+    
+
+
 
 T = TypeVar('T', bound=DataSeriese)
 class DataArray(np.ndarray, Generic[T]):

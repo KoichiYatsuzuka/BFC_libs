@@ -8,6 +8,7 @@ pytest がインストールされていれば `pytest test_quantity_array.py` �
 from __future__ import annotations
 
 import math
+from typing import Any, get_type_hints
 
 import numpy as np
 
@@ -80,6 +81,23 @@ def test_construction_and_validation() -> None:
     _assert_raises(TypeError, lambda: QArray([1.0, 2.0]))  # 要素型未指定
     _assert_raises(TypeError, lambda: QArray[int])  # type: ignore[type-var]
     _assert_raises(ValueError, lambda: PotentialArray([[1.0, 2.0]]))  # 次元不一致
+
+
+def test_any_subscript_and_type_hints() -> None:
+    # Python 3.11+ では typing.Any が本物のクラスだが、物理量型ではないので
+    # 特殊化せず静的型検査用エイリアスにフォールバックすること
+    any_alias = QArray[Any]
+    assert not isinstance(any_alias, type)
+    assert Any not in [key[1] for key in QArray._specializations]
+    # クラス注釈中の "QArray[Any]" を評価しても TypeError にならないこと
+    # (formula_checker 等が get_type_hints で型情報を読む場面)
+    hints_potential = get_type_hints(PotentialArray)
+    assert "_specializations" in hints_potential
+    get_type_hints(PotentialMatrix)
+    get_type_hints(ImpedanceArray)
+    # Any 以外の物理量でない型は引き続き入力エラー(消してはいけないエラー)
+    _assert_raises(TypeError, lambda: QArray[object])
+    _assert_raises(TypeError, lambda: QArray[float])
 
 
 def test_construction_from_ndarray() -> None:

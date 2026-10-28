@@ -24,6 +24,10 @@
     reduce は add / minimum / maximum のみ型を保つ(sum, min, max, mean が対応)
 - ufunc 以外の numpy API(np.meshgrid, np.concatenate 等)は
   __array_function__ で一律、素の ndarray に降格する。
+- numpy.ma(マスク配列)も同様に、クラス属性 _baseclass = np.ndarray で
+  素の ndarray を基底として扱わせる。これが無いと numpy.ma が
+  「QArray のまま dtype=bool の view」を作って不変条件違反になり、
+  内部で numpy.ma を使う matplotlib の ax.scatter 等が失敗する。
 - view / reshape 等で不変条件(次元・dtype)が壊れる操作は
   __array_finalize__ が検出して ValueError を投げる(入力検証)。
 - 動的生成クラスはディスクへの pickle 不可(copy.deepcopy は可)。
@@ -89,6 +93,10 @@ class QArray(np.ndarray, Generic[ElemT]):
             実体の dtype。葉が ComplexQuantity なら complex128、他は float64。
         _specializations: ClassVar[dict]
             特殊化クラスのメモ化キャッシュ。`QArray[X] is QArray[X]` を保証する。
+        _baseclass: ClassVar[type[np.ndarray]]
+            常に np.ndarray。numpy.ma が MaskedArray の「元のクラス」として
+            参照する属性(numpy.ma 内部の名前に合わせている)。
+            np.ma.masked_invalid(q_array).data 等は素の ndarray になる。
         real, imag: property
             実部・虚部。葉が ComplexQuantity のとき、対の実数型
             (_real_type)の QArray を返す(未指定なら素の ndarray)。
@@ -105,6 +113,11 @@ class QArray(np.ndarray, Generic[ElemT]):
     _expected_ndim: ClassVar[int]
     _dtype: ClassVar["np.dtype[Any]"]
     _specializations: ClassVar[dict[tuple[type, type], type["QArray[Any]"]]] = {}
+    # numpy.ma は MaskedArray 生成時に getattr(data, "_baseclass", type(data))
+    # で元のクラスを決め、マスク(bool)等をそのクラスの view に戻す。
+    # QArray のままだと dtype=bool の view になり __array_finalize__ が
+    # ValueError を投げるため、素の ndarray を名乗らせる(numpy 1.26.4 で確認)。
+    _baseclass: ClassVar[type[np.ndarray]] = np.ndarray
 
     # ---------------- 特殊化クラスの生成(テンプレート機構) ----------------
 
@@ -115,15 +128,20 @@ class QArray(np.ndarray, Generic[ElemT]):
         引数
             item: 要素型。Quantity / ComplexQuantity のサブクラス、または
                   QArray の特殊化クラス(入れ子 = 多次元)。
-                  TypeVar 等の「型でない添字」はジェネリック関数の注釈用に
-                  通常の静的型検査用エイリアスへフォールバックする。
+                  TypeVar / typing.Any 等の「物理量型でない添字」は
+                  ジェネリック関数の注釈用に通常の静的型検査用エイリアスへ
+                  フォールバックする。
         返り値
             特殊化された本物のクラス(同じ item には常に同一のクラス)。
         エラー
             物理量型でも QArray でもない型を渡すと TypeError。
         """
-        if not isinstance(item, type):
-            # TypeVar / Any など: 静的型検査用の通常のエイリアスに委ねる
+        if not isinstance(item, type) or item is Any:
+            # TypeVar / Any など: 静的型検査用の通常のエイリアスに委ねる。
+            # Python 3.11 以降は typing.Any が本物のクラスで
+            # isinstance(Any, type) が True になるため、明示的に除外する。
+            # (除外しないと typing.get_type_hints が注釈中の
+            #  "QArray[Any]" を評価した時点で TypeError になる)
             return super().__class_getitem__(item)  # type: ignore[misc]
 
         if issubclass(item, QArray):
